@@ -54,7 +54,7 @@ Framework.init(
         debug = BuildConfig.DEBUG,
         versionCode = BuildConfig.VERSION_CODE,
         versionName = BuildConfig.VERSION_NAME,
-        sslCertRawResId = R.raw.my_cert,  // Release 模式 SSL 证书
+        sslCertRawResId = R.raw.my_cert,  // 可选；为空时使用系统信任链
         debugApiPrefix = "dev-api",
         releaseApiPrefix = "prod-api"
     )
@@ -161,6 +161,9 @@ Framework.setOnTokenExpired {
 ### Q6: Release 模式如何配置 SSL 证书？
 1. 将证书文件放到 `app/src/main/res/raw/my_cert.crt`
 2. `FrameworkConfig.sslCertRawResId = R.raw.my_cert`
+
+默认使用系统信任链和主机名校验。Debug 连接自签名 HTTPS/WSS 服务时，同样通过
+`sslCertRawResId` 提供可信证书，不建议关闭证书或主机名校验。
 
 ### Q7: 如何添加自定义数据库实体？
 在 `app/src/main/java/com/mycompany/myapp/data/db/` 下创建：

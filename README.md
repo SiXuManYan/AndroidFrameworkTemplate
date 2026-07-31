@@ -12,7 +12,7 @@
 
 | 能力 | 实现亮点 |
 | --- | --- |
-| 🌐 **网络层** | Retrofit + OkHttp + 4 个职责清晰的自定义 Interceptor (Token / Auth / Version / Logging)，双模式 SSL (Debug 信任所有 / Release 读 raw 证书) |
+| 🌐 **网络层** | Retrofit + OkHttp + 4 个职责清晰的自定义 Interceptor (Token / Auth / Version / Logging)，默认系统 TLS 校验并支持自定义证书 |
 | 🔌 **WebSocket** | 单例管理 + 自动重连 + Flow 状态/消息流 + 与网络层共享 SSL 配置 |
 | 💾 **数据持久化** | Room (KSP 编译) + DataStore Preferences + SharedPreferences 双写双读防丢 |
 | 🎨 **UI 基类** | ViewBinding 泛型 BaseActivity / BaseFragment / BaseDialog(DialogFragment) + edge-to-edge 系统栏适配 + 软键盘自适应 |

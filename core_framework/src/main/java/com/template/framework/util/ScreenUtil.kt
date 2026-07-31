@@ -1,6 +1,7 @@
 package com.template.framework.util
 
 import android.content.Context
+import android.os.Build
 import android.util.TypedValue
 import androidx.annotation.DimenRes
 
@@ -27,13 +28,21 @@ object ScreenUtil {
     }
 
     fun px2sp(context: Context, pxValue: Float): Float {
-        val fontScale = context.resources.displayMetrics.scaledDensity
-        return pxValue / fontScale
+        val metrics = context.resources.displayMetrics
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            TypedValue.deriveDimension(TypedValue.COMPLEX_UNIT_SP, pxValue, metrics)
+        } else {
+            @Suppress("DEPRECATION")
+            pxValue / metrics.scaledDensity
+        }
     }
 
     fun sp2px(context: Context, spValue: Float): Float {
-        val fontScale = context.resources.displayMetrics.scaledDensity
-        return spValue * fontScale
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            spValue,
+            context.resources.displayMetrics
+        )
     }
 
     fun dimensionToPx(context: Context, @DimenRes resId: Int): Int {

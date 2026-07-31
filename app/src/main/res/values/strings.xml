@@ -1,4 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Framework Demo</string>
+    <string name="demo_title">Android 框架模板 - Demo</string>
+    <string name="server_ip_label">服务器 IP</string>
+    <string name="server_ip_hint">192.168.1.1</string>
+    <string name="server_port_label">服务器端口</string>
+    <string name="server_port_hint">8080</string>
+    <string name="save_settings">保存设置（DataStore）</string>
+    <string name="call_login_api">调用 Login API（Retrofit + OkHttp）</string>
+    <string name="connect_websocket">连接 WebSocket</string>
+    <string name="disconnect_websocket">断开 WebSocket</string>
+    <string name="status_placeholder">运行状态会显示在这里</string>
+    <string name="server_required">请填写 IP 与端口</string>
+    <string name="server_saved">已保存：%1$s:%2$s</string>
+    <string name="login_success">登录成功：code=%1$d</string>
+    <string name="login_failed">登录失败：%1$s (code=%2$d)</string>
+    <string name="login_status">Server: %1$s:%2$s\nLogin result: %3$d %4$s</string>
+    <string name="request_failed">请求异常：%1$s</string>
+    <string name="exception_status">Exception: %1$s</string>
+    <string name="websocket_connected">WebSocket 已连接</string>
+    <string name="websocket_disconnected">WebSocket 已断开</string>
 </resources>

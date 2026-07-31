@@ -1,17 +1,16 @@
 package com.template.framework.api
 
-import android.content.Context
 import com.template.framework.Framework
 import com.template.framework.constants.FrameworkConstants
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.io.InputStream
+import java.security.KeyStore
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
+import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
 /**
@@ -20,8 +19,8 @@ import javax.net.ssl.X509TrustManager
  * 提供 OkHttpClient / Retrofit / ApiService 的工厂方法。
  *
  * ## SSL 证书策略
- * - Debug 模式：信任所有证书（方便测试自签名证书）
- * - Release 模式：仅信任 [FrameworkConfig.sslCertRawResId] 指定的证书；为 null 时同样信任所有
+ * - 默认使用系统信任链和主机名校验
+ * - 配置 [FrameworkConfig.sslCertRawResId] 时使用指定的 CA 或服务器证书
  *
  * ## Token 失效回调
  * 通过 [setOnTokenExpired] 或 [com.template.framework.Framework.setOnTokenExpired] 设置。
@@ -48,56 +47,30 @@ object NetworkModule {
      */
     fun configureSslSocketFactory(builder: OkHttpClient.Builder) {
         val config = Framework.getConfig()
-        if (config.debug) {
-            trustAll(builder)
-        } else {
-            val certResId = config.sslCertRawResId
-            if (certResId == null) {
-                trustAll(builder)
-            } else {
-                trustCustomCert(builder, certResId)
-            }
-        }
-    }
-
-    private fun trustAll(builder: OkHttpClient.Builder) {
-        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        })
-        val sslContext = SSLContext.getInstance("TLS")
-        sslContext.init(null, trustAllCerts, java.security.SecureRandom())
-        builder.sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-        builder.hostnameVerifier { _, _ -> true }
+        config.sslCertRawResId?.let { trustCustomCert(builder, it) }
     }
 
     private fun trustCustomCert(builder: OkHttpClient.Builder, certResId: Int) {
         try {
-            val context: Context = Framework.getContext()
             val certificateFactory = CertificateFactory.getInstance("X.509")
-            val inputStream: InputStream = context.resources.openRawResource(certResId)
-            val trustedCertificate = certificateFactory.generateCertificate(inputStream) as X509Certificate
-            inputStream.close()
+            val certificate = Framework.getContext().resources
+                .openRawResource(certResId)
+                .use(certificateFactory::generateCertificate)
 
-            val customTrustManager = object : X509TrustManager {
-                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
-                    if (chain == null || chain.isEmpty()) {
-                        throw IllegalArgumentException("证书链为空")
-                    }
-                    val serverCert = chain[0]
-                    if (serverCert.publicKey != trustedCertificate.publicKey) {
-                        throw java.security.cert.CertificateException("证书不匹配")
-                    }
-                }
-                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf(trustedCertificate)
+            val keyStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+                load(null, null)
+                setCertificateEntry("custom_server", certificate)
             }
+            val trustManagerFactory = TrustManagerFactory.getInstance(
+                TrustManagerFactory.getDefaultAlgorithm()
+            ).apply { init(keyStore) }
+            val trustManager = trustManagerFactory.trustManagers
+                .filterIsInstance<X509TrustManager>()
+                .single()
 
             val sslContext = SSLContext.getInstance("TLS")
-            sslContext.init(null, arrayOf(customTrustManager), java.security.SecureRandom())
-            builder.sslSocketFactory(sslContext.socketFactory, customTrustManager)
-            builder.hostnameVerifier { _, _ -> true }
+            sslContext.init(null, arrayOf(trustManager), java.security.SecureRandom())
+            builder.sslSocketFactory(sslContext.socketFactory, trustManager)
         } catch (e: Exception) {
             throw IllegalStateException("服务器证书配置失败", e)
         }

@@ -168,7 +168,7 @@ sequenceDiagram
         NM->>INT: addInterceptor(Token)
         NM->>INT: addInterceptor(Auth)
         NM->>OK: configureSslSocketFactory
-        Note right of OK: Debug → 信任所有证书<br/>Release → 仅信任 raw 证书
+        Note right of OK: 默认 → 系统信任链<br/>可选 raw 自定义证书
         NM->>API: Retrofit.create(ApiService)
         deactivate NM
         API-->>Repo: ApiService 实例 (缓存)

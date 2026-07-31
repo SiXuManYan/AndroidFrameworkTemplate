@@ -17,6 +17,7 @@ import androidx.core.view.WindowInsetsCompat
  */
 object SystemBarUtils {
 
+    @Suppress("DEPRECATION")
     fun applyEdgeToEdge(activity: Activity, contentView: View) {
         val window = activity.window
         WindowCompat.setDecorFitsSystemWindows(window, false)

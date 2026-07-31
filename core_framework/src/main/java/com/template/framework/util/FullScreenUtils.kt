@@ -2,11 +2,11 @@ package com.template.framework.util
 
 import android.app.Activity
 import android.app.Dialog
-import android.os.Build
-import android.view.View
 import android.view.Window
-import android.view.WindowInsetsController
 import android.view.WindowManager
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 /**
  * Dialog 扩展函数：自动应用全屏设置
@@ -25,8 +25,8 @@ fun Dialog.showFullScreen() {
  * 全屏工具类
  *
  * - 隐藏状态栏和导航栏
- * - 禁止下拉通知栏
- * - 兼容 Android 11+ WindowInsetsController 与旧版 WindowManager 方案
+ * - 允许通过滑动临时显示系统栏
+ * - 使用 AndroidX WindowInsets API 兼容各系统版本
  *
  * @author Shiwei Wang
  * @date 2026-02
@@ -37,24 +37,7 @@ object FullScreenUtils {
      * 为 Activity 设置全屏
      */
     fun enableFullScreen(activity: Activity) {
-        val window = activity.window ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-            window.insetsController?.let { controller ->
-                controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    )
-        }
+        configureImmersiveWindow(activity.window)
     }
 
     /**
@@ -62,23 +45,16 @@ object FullScreenUtils {
      */
     fun enableFullScreenForDialog(dialog: Dialog) {
         val window: Window = dialog.window ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-            window.insetsController?.let { controller ->
-                controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    )
-        }
+        configureImmersiveWindow(window)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun configureImmersiveWindow(window: Window) {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 }

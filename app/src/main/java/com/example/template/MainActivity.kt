@@ -50,14 +50,14 @@ class MainActivity : BaseActivity<ActivityMainBinding>() {
             val ip = binding.etIp.text.toString().trim()
             val port = binding.etPort.text.toString().trim()
             if (ip.isEmpty() || port.isEmpty()) {
-                toast("请填写 IP 与端口")
+                toast(getString(R.string.server_required))
                 return@setOnClickListener
             }
             lifecycleScope.launch {
                 Framework.getPreferences().saveServerIp(ip)
                 Framework.getPreferences().saveServerPort(port)
                 Framework.getRepository().clearApiServiceCache()
-                toast("已保存：$ip:$port")
+                toast(getString(R.string.server_saved, ip, port))
             }
         }
 
@@ -79,14 +79,20 @@ class MainActivity : BaseActivity<ActivityMainBinding>() {
                         response.data?.accessToken?.let { token ->
                             Framework.getPreferences().saveAccessToken(token)
                         }
-                        toast("登录成功：code=${response.code}")
+                        toast(getString(R.string.login_success, response.code))
                     } else {
-                        toast("登录失败：${response.message} (code=${response.code})")
+                        toast(getString(R.string.login_failed, response.message, response.code))
                     }
-                    binding.tvStatus.text = "Server: $ip:$port\nLogin result: ${response.code} ${response.message}"
+                    binding.tvStatus.text = getString(
+                        R.string.login_status,
+                        ip,
+                        port,
+                        response.code,
+                        response.message
+                    )
                 } catch (e: Exception) {
-                    toast("请求异常：${e.message}")
-                    binding.tvStatus.text = "Exception: ${e.message}"
+                    toast(getString(R.string.request_failed, e.message))
+                    binding.tvStatus.text = getString(R.string.exception_status, e.message)
                 }
             }
         }
@@ -95,18 +101,18 @@ class MainActivity : BaseActivity<ActivityMainBinding>() {
             lifecycleScope.launch {
                 val repo = Framework.getRepository()
                 repo.connectWebSocket()
-                toast("WebSocket 已连接")
+                toast(getString(R.string.websocket_connected))
             }
         }
 
         binding.btnWsDisconnect.setOnClickListener {
             Framework.getRepository().disconnectWebSocket()
-            toast("WebSocket 已断开")
+            toast(getString(R.string.websocket_disconnected))
         }
     }
 
     override fun initData() {
-        binding.tvTitle.text = "Android 框架模板 - Demo"
+        binding.tvTitle.setText(R.string.demo_title)
     }
 
     private fun toast(msg: String) {

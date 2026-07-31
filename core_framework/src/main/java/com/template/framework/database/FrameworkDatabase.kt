@@ -60,7 +60,7 @@ abstract class FrameworkDatabase : RoomDatabase() {
                     FrameworkDatabase::class.java,
                     dbName
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

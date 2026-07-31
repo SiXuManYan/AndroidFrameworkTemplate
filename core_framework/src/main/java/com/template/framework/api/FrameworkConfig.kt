@@ -15,7 +15,7 @@ package com.template.framework.api
  * @param defaultServerPort Debug 模式默认服务器端口（可选）
  * @param debugApiPrefix Debug 模式 API 路径前缀
  * @param releaseApiPrefix Release 模式 API 路径前缀
- * @param sslCertRawResId Release 模式下 SSL 证书的 raw 资源 ID（可选；为 null 时 Release 模式也信任所有证书）
+ * @param sslCertRawResId 自定义 CA 或服务器证书的 raw 资源 ID；为 null 时使用系统信任链
  *
  * @author Shiwei Wang
  * @date 2026-02

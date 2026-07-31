@@ -26,7 +26,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="服务器 IP"
+            android:text="@string/server_ip_label"
             android:textSize="14sp" />
 
         <EditText
@@ -34,7 +34,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:hint="192.168.1.1"
+            android:hint="@string/server_ip_hint"
+            android:importantForAutofill="no"
             android:inputType="text"
             android:singleLine="true" />
 
@@ -42,7 +43,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="服务器端口"
+            android:text="@string/server_port_label"
             android:textSize="14sp" />
 
         <EditText
@@ -50,7 +51,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:hint="8080"
+            android:hint="@string/server_port_hint"
+            android:importantForAutofill="no"
             android:inputType="number"
             android:singleLine="true" />
 
@@ -59,7 +61,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="保存设置（DataStore）" />
+            android:text="@string/save_settings" />
 
         <View
             android:layout_width="match_parent"
@@ -71,7 +73,7 @@
             android:id="@+id/btn_login"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="调用 Login API（Retrofit + OkHttp）" />
+            android:text="@string/call_login_api" />
 
         <View
             android:layout_width="match_parent"
@@ -83,14 +85,14 @@
             android:id="@+id/btn_ws_connect"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="连接 WebSocket" />
+            android:text="@string/connect_websocket" />
 
         <Button
             android:id="@+id/btn_ws_disconnect"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="断开 WebSocket" />
+            android:text="@string/disconnect_websocket" />
 
         <TextView
             android:id="@+id/tv_status"
@@ -99,7 +101,7 @@
             android:layout_marginTop="24dp"
             android:background="#10000000"
             android:padding="12dp"
-            android:text="运行状态会显示在这里"
+            android:text="@string/status_placeholder"
             android:textSize="12sp"
             tools:text="Login result: 200 成功" />
 
