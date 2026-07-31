@@ -88,10 +88,10 @@ flowchart TB
 - 业务可继承 `FrameworkRepository` 添加业务方法
 
 ### 7. ui/base（UI 基类）
-- **`BaseActivity<VB>`** - ViewBinding + 全屏 + 点击外部隐藏键盘 + 禁用系统返回 + 语言切换
+- **`BaseActivity<VB>`** - ViewBinding + edge-to-edge 系统栏适配 + 点击外部隐藏键盘 + 可选返回键拦截 + 语言切换
 - **`BaseFragment<VB>`** - ViewBinding + 生命周期钩子
-- **`BaseDialog(context)`** - 全屏 + 点击外部隐藏键盘
-- **`BaseDialogFragment<VB>`** - 全屏 + 软键盘上移 + 点击外部隐藏键盘
+- **`BaseDialog(context)`** - 可选沉浸式全屏 + 点击外部隐藏键盘
+- **`BaseDialogFragment<VB>`** - 全窗口展示 + 可选沉浸式全屏 + 软键盘上移 + 点击外部隐藏键盘
 - **`CommonAdapter<T, VB>`** - 单一 ViewBinding 适配器
 - **`MultiViewTypeAdapter<T>`** - 多 ViewBinding 适配器
 
@@ -100,7 +100,8 @@ flowchart TB
 - `DeviceUtils` - IP / SN / 大小写转换
 - `ScreenUtil` - dp/px/sp 互转
 - `LanguageUtils` - 中英文切换 + 淡入动画
-- `FullScreenUtils` - 全屏 + Dialog 全屏扩展
+- `SystemBarUtils` - 通用 edge-to-edge 与安全区域适配
+- `FullScreenUtils` - kiosk 场景的 Activity / Dialog 沉浸式全屏
 - `ViewExtensions` - `setOnMultiClickListener`
 - `EditTextExtensions` - `requestFocusSafely` / `keepFocus` / `setShowSoftInputOnFocus`
 - `TimeUtils` - 时间格式化
@@ -134,8 +135,8 @@ sequenceDiagram
     PM-->>AC: Flow.first()
     AC->>AC: LanguageUtils.setLanguage()
     AC->>AC: initViewBinding()
-    AC->>AC: FullScreenUtils.enableFullScreen()
-    AC->>AC: 注册 onBackPressedCallback (禁用返回)
+    AC->>AC: SystemBarUtils.applyEdgeToEdge()
+    AC->>AC: 按需注册 onBackPressedCallback
     AC->>AC: initView / initListener / initData
     Note over AC: 若检测到语言切换标志<br/>播放 200ms 淡入动画
 ```

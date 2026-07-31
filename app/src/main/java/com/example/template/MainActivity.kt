@@ -2,6 +2,7 @@ package com.example.template
 
 import android.os.Bundle
 import android.widget.Toast
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.example.template.databinding.ActivityMainBinding
 import com.template.framework.Framework
@@ -26,6 +27,11 @@ import kotlinx.coroutines.launch
  * @date 2026-02
  */
 class MainActivity : BaseActivity<ActivityMainBinding>() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        super.onCreate(savedInstanceState)
+    }
 
     override fun initViewBinding() = ActivityMainBinding.inflate(layoutInflater)
 

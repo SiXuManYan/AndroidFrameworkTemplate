@@ -110,6 +110,13 @@ class ProfileActivity : BaseActivity<ActivityProfileBinding>() {
 }
 ```
 
+### 5.4 配置 Android 12 SplashScreen
+
+模板的 `MainActivity` 已包含 `installSplashScreen()`，Manifest 使用
+`Theme.Template.Starting` 作为启动主题。替换启动图标或背景色时，修改
+`app/src/main/res/values/themes.xml` 中的 `windowSplashScreenAnimatedIcon`
+和 `windowSplashScreenBackground` 即可，不需要额外创建 SplashActivity。
+
 ## 常见问题
 
 ### Q1: 如何修改 DataStore 文件名？
@@ -166,4 +173,13 @@ Framework.setOnTokenExpired {
 abstract class AppDatabase : FrameworkDatabase() {
     abstract fun myDao(): MyDao
 }
+```
+
+### Q8: 如何启用平板 kiosk 全屏？
+
+`BaseActivity` 默认采用适合手机和平板的 edge-to-edge 布局，并保留系统栏。
+只在确实需要隐藏状态栏和导航栏的页面显式调用：
+
+```kotlin
+FullScreenUtils.enableFullScreen(this)
 ```

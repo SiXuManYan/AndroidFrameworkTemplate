@@ -14,7 +14,7 @@ import com.template.framework.util.FullScreenUtils
  * Dialog 基类
  *
  * 提供能力：
- * - 自动全屏（show 时调用 [FullScreenUtils.enableFullScreenForDialog]）
+ * - 可选的沉浸式全屏
  * - 点击外部空白区域时，先隐藏软键盘，再关闭（可通过 [enableOutsideDismiss] 关闭）
  *
  * 布局要求：
@@ -39,13 +39,18 @@ abstract class BaseDialog(context: Context) : Dialog(context) {
     /** 是否允许点击对话框外部时关闭 */
     protected open val enableOutsideDismiss: Boolean = true
 
+    /** kiosk 场景可覆盖为 true；通用手机界面默认保留系统栏。 */
+    protected open val enableImmersiveFullScreen: Boolean = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
     }
 
     override fun show() {
         super.show()
-        FullScreenUtils.enableFullScreenForDialog(this)
+        if (enableImmersiveFullScreen) {
+            FullScreenUtils.enableFullScreenForDialog(this)
+        }
         setupOutsideClickBehaviour()
     }
 

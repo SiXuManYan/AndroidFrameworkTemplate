@@ -15,7 +15,8 @@
 | 🌐 **网络层** | Retrofit + OkHttp + 4 个职责清晰的自定义 Interceptor (Token / Auth / Version / Logging)，双模式 SSL (Debug 信任所有 / Release 读 raw 证书) |
 | 🔌 **WebSocket** | 单例管理 + 自动重连 + Flow 状态/消息流 + 与网络层共享 SSL 配置 |
 | 💾 **数据持久化** | Room (KSP 编译) + DataStore Preferences + SharedPreferences 双写双读防丢 |
-| 🎨 **UI 基类** | ViewBinding 泛型 BaseActivity / BaseFragment / BaseDialog(DialogFragment) + 全屏 + 软键盘自适应 |
+| 🎨 **UI 基类** | ViewBinding 泛型 BaseActivity / BaseFragment / BaseDialog(DialogFragment) + edge-to-edge 系统栏适配 + 软键盘自适应 |
+| 🚀 **启动体验** | AndroidX SplashScreen 统一适配 Android 12+ 系统启动画面与旧版本 |
 | 🧰 **工具类** | TimberUtil / DeviceUtils / ScreenUtil / LanguageUtils / FullScreenUtils / EditTextExtensions... |
 | 🏛️ **架构** | MVVM + 单 Activity + 多 Fragment，框架层与应用层彻底解耦 |
 | 🚀 **异步** | Kotlin Coroutines + Flow，统一暴露状态与事件 |
@@ -68,6 +69,10 @@ git clone https://github.com/SiXuManYan/AndroidFrameworkTemplate.git
 - 输入 IP/端口 → 点击「保存设置」测试 DataStore 持久化
 - 点击「调用 Login API」测试网络层（Retrofit + 4 个 Interceptor + Token 注入）
 - 点击「连接 WebSocket」测试 WebSocket 自动重连
+
+示例页默认使用通用手机的 edge-to-edge 布局：状态栏与导航栏保持可用，
+内容自动避让刘海和手势区域。确需平板 kiosk 模式时，可显式调用
+`FullScreenUtils.enableFullScreen(activity)`。
 
 ### 2. 接入新项目
 

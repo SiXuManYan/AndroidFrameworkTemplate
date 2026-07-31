@@ -17,14 +17,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.DialogFragment
 import androidx.viewbinding.ViewBinding
 import com.template.framework.R
-import com.template.framework.util.showFullScreen
+import com.template.framework.util.FullScreenUtils
 
 /**
  * DialogFragment 基类
  *
  * 提供能力：
  * - ViewBinding 生命周期管理
- * - 全屏展示
+ * - 全窗口展示，默认保留系统栏
  * - 点击外部空白区域时，先隐藏软键盘，再关闭（可通过 [enableOutsideDismiss] 关闭）
  * - 软键盘弹出时，自动上移 CardView，保证 EditText 可见
  *
@@ -46,6 +46,9 @@ abstract class BaseDialogFragment<VB : ViewBinding> : DialogFragment() {
 
     /** 是否允许点击对话框外部时关闭 */
     protected open val enableOutsideDismiss: Boolean = true
+
+    /** kiosk 场景可覆盖为 true；通用手机界面默认保留系统栏。 */
+    protected open val enableImmersiveFullScreen: Boolean = false
 
     private var currentCardViewTranslationY = 0f
 
@@ -84,7 +87,9 @@ abstract class BaseDialogFragment<VB : ViewBinding> : DialogFragment() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
         )
-        dialog?.showFullScreen()
+        if (enableImmersiveFullScreen) {
+            dialog?.let(FullScreenUtils::enableFullScreenForDialog)
+        }
     }
 
     private fun setupOutsideClickBehaviour(root: View) {

@@ -12,8 +12,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.viewbinding.ViewBinding
 import com.template.framework.Framework
-import com.template.framework.util.FullScreenUtils
 import com.template.framework.util.LanguageUtils
+import com.template.framework.util.SystemBarUtils
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
@@ -23,8 +23,8 @@ import timber.log.Timber
  *
  * 提供能力：
  * - ViewBinding 生命周期管理（onCreate 初始化、onDestroy 置空）
- * - 自动全屏
- * - 全局禁用系统返回键（子类可覆盖 [onBackPressedCallback] 实现自定义行为）
+ * - Edge-to-edge 系统栏适配（保留状态栏、导航栏并自动避让安全区域）
+ * - 可选的系统返回键拦截
  * - 点击空白处关闭软键盘
  * - 语言设置同步应用（基于 [LanguageUtils] + [Framework.getPreferences]）
  *
@@ -55,7 +55,7 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
      * 是否启用全局返回键拦截
      * 子类可重写：返回 false 即可恢复系统默认返回行为
      */
-    protected open val enableBackKeyInterceptor: Boolean = true
+    protected open val enableBackKeyInterceptor: Boolean = false
 
     private val onBackPressedCallback = object : OnBackPressedCallback(enableBackKeyInterceptor) {
         override fun handleOnBackPressed() {
@@ -71,7 +71,7 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
         _binding = initViewBinding()
         setContentView(binding.root)
 
-        FullScreenUtils.enableFullScreen(this)
+        SystemBarUtils.applyEdgeToEdge(this, binding.root)
 
         if (enableBackKeyInterceptor) {
             onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
@@ -84,16 +84,6 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
         if (LanguageUtils.isLanguageSwitching()) {
             applyFadeInAnimation()
         }
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) FullScreenUtils.enableFullScreen(this)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        FullScreenUtils.enableFullScreen(this)
     }
 
     /**
