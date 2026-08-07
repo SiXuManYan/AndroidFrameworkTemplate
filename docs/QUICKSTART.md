@@ -1,32 +1,42 @@
 # 接入新项目指南
 
-> 在 5 分钟内基于此模板创建新项目。
+本文说明如何从模板创建业务项目。开始前请准备支持 AGP 8.13.2 的 Android Studio、
+JDK 17 和 Android SDK Platform 36。
 
-## 步骤 1：复制模板
+## 步骤 1：获取模板
 
 ```bash
-cp -r AristonVsop my-new-project
+git clone https://github.com/SiXuManYan/AndroidFrameworkTemplate.git my-new-project
 cd my-new-project
+./gradlew :app:assembleDebug
 ```
 
-清理模板的演示资源：
-- 删除 `app/src/main/java/com/example/template/MainActivity.kt`（保留 `App.kt`）
-- 删除 `app/src/main/res/layout/activity_main.xml`
+先确认原始模板可以构建，再开始改名和删除 Demo。Windows 将最后一条命令改为
+`gradlew.bat :app:assembleDebug`。
+
+不需要示例页面时，可删除：
+
+- `app/src/main/java/com/example/template/MainActivity.kt`
+- `app/src/main/res/layout/activity_main.xml`
+
+删除后需要同步从 Manifest 移除 `.MainActivity`，并配置自己的启动 Activity。
 
 ## 步骤 2：重命名包名
 
-全局替换以下字符串：
-- `com.example.template` → 你的应用包名，如 `com.mycompany.myapp`
-- `com.template.framework` → 通常保持不变（如需修改，需同步修改 `core_framework/` 所有文件的 package）
+将 `com.example.template` 替换为业务包名，例如 `com.mycompany.myapp`。至少检查：
 
-修改位置：
-1. `app/build.gradle.kts` - `namespace` 和 `applicationId`
-2. `app/src/main/AndroidManifest.xml` - `.App` 和 `.MainActivity`
-3. `core_framework/build.gradle.kts` - `namespace`（如要改 framework 包名）
+1. `app/build.gradle.kts` 中的 `namespace` 和 `applicationId`。
+2. `App.kt`、`MainActivity.kt` 的 `package` 声明及对应源码目录。
+3. Manifest 中相对类名 `.App`、`.MainActivity` 是否仍能由新 namespace 正确解析。
+4. `settings.gradle.kts` 中的 `rootProject.name`。
+
+`com.template.framework` 是框架库的独立命名空间，通常无需修改。确需修改时，要同步
+更新 `core_framework` 的 namespace、全部 Kotlin package、源码目录和 App 中的 import。
 
 ## 步骤 3：配置签名与版本
 
 修改 `app/build.gradle.kts`：
+
 ```kotlin
 defaultConfig {
     applicationId = "com.mycompany.myapp"
@@ -44,9 +54,14 @@ signingConfigs {
 }
 ```
 
+示例中的密码只是配置位置说明。正式项目应从未提交的本地属性、环境变量或 CI Secret
+读取签名信息，不要把 keystore 和明文密码提交到仓库。配置完成后同时验证
+`:app:assembleDebug` 和 `:app:assembleRelease`。
+
 ## 步骤 4：在 FrameworkConfig 中配置运行时参数
 
 修改 `app/src/main/java/com/mycompany/myapp/App.kt`：
+
 ```kotlin
 Framework.init(
     app = this,
@@ -61,10 +76,23 @@ Framework.init(
 )
 ```
 
+配置含义：
+
+| 参数 | 说明 |
+| --- | --- |
+| `debug` | 控制日志，并决定 HTTP/WS 使用明文还是 TLS |
+| `versionCode` / `versionName` | 自动写入请求 Header |
+| `debugApiPrefix` / `releaseApiPrefix` | 拼接到 HTTP 和 WebSocket 地址的路径前缀 |
+| `sslCertRawResId` | 可选自定义 CA/服务器证书；`null` 使用系统信任链 |
+| `dataStoreName` | 当前用于派生默认 Room 数据库名；框架 DataStore 名仍固定 |
+| `defaultServerIp` / `defaultServerPort` | 当前为预留字段，业务仍需主动保存初始地址 |
+
 ## 步骤 5：实现业务
 
 ### 5.1 定义业务接口
-在 `core_framework/src/main/java/com/template/framework/api/` 下添加：
+
+与具体服务端绑定的接口建议放在 App 的 `data/remote/`，不要继续写入通用框架模块：
+
 ```kotlin
 interface MyApi {
     @GET("user/profile")
@@ -76,15 +104,28 @@ interface MyApi {
 ```
 
 ### 5.2 创建自定义 Repository
+
 在 `app/src/main/java/com/mycompany/myapp/data/` 下添加：
+
 ```kotlin
-class AppRepository private constructor(context: Context) : FrameworkRepository(context, Framework.getPreferences()) {
+class AppRepository private constructor(
+    context: Context,
+    private val preferences: PreferencesManager = Framework.getPreferences(),
+) : FrameworkRepository(context, preferences) {
+
+    private suspend fun createMyApi(): MyApi = NetworkModule.createApiService<MyApi>(
+        baseUrl = getCurrentBaseUrl(),
+        getToken = { preferences.accessToken.first() },
+        clearToken = { preferences.clearAccessToken() },
+    )
 
     suspend fun getProfile(): ApiResponse<UserProfile> =
-        NetworkModule.createApiService<MyApi>(getCurrentBaseUrl()).getProfile()
+        createMyApi().getProfile()
 
     companion object {
-        @Volatile private var INSTANCE: AppRepository? = null
+        @Volatile
+        private var INSTANCE: AppRepository? = null
+
         fun getInstance(context: Context): AppRepository =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: AppRepository(context.applicationContext).also { INSTANCE = it }
@@ -93,7 +134,11 @@ class AppRepository private constructor(context: Context) : FrameworkRepository(
 }
 ```
 
+上述写法保留了 Token 注入和 401 清理行为。高频请求场景应像 `FrameworkRepository`
+一样按 Base URL 缓存自定义 ApiService，并在服务器地址变化时清除缓存。
+
 ### 5.3 实现 Activity
+
 ```kotlin
 class ProfileActivity : BaseActivity<ActivityProfileBinding>() {
     override fun initViewBinding() = ActivityProfileBinding.inflate(layoutInflater)
@@ -120,45 +165,77 @@ class ProfileActivity : BaseActivity<ActivityProfileBinding>() {
 ## 常见问题
 
 ### Q1: 如何修改 DataStore 文件名？
+
 修改 `core_framework/src/main/java/com/template/framework/datastore/PreferencesManager.kt`：
+
 ```kotlin
 private val Context.frameworkDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "my_app_preferences"  // 修改此处
 )
 ```
 
+`FrameworkConfig.dataStoreName` 当前不会修改这个文件名。若只是业务数据需要独立存储，
+优先在 App 模块创建单独的 DataStore，不要修改框架默认存储。
+
 ### Q2: 如何添加自定义 DataStore Key？
-在 `App` 模块中继承 `PreferencesManager`：
+
+框架 DataStore 和 Key 被封装在 `PreferencesManager` 内部，不能只靠继承增加 Key。
+在 App 模块创建独立 Manager：
+
 ```kotlin
-class AppPreferences(context: Context) : PreferencesManager(context) {
-    val userId: Flow<String?> = ... // 自定义 Key
+private val Context.appDataStore by preferencesDataStore(name = "app_preferences")
+
+class AppPreferences(context: Context) {
+    private val dataStore = context.applicationContext.appDataStore
+    private val userIdKey = stringPreferencesKey("user_id")
+
+    val userId: Flow<String?> = dataStore.data.map { preferences ->
+        preferences[userIdKey]
+    }
+
+    suspend fun saveUserId(userId: String) {
+        dataStore.edit { preferences -> preferences[userIdKey] = userId }
+    }
 }
 ```
 
 ### Q3: 如何禁用 BaseActivity 的语言自动应用？
-子类覆盖：
-```kotlin
-class MyActivity : BaseActivity<ActivityMyBinding>() {
-    // 默认行为即可，或重写 applyLanguageSettingsSync
-}
-```
+
+当前 `applyLanguageSettingsSync()` 是 `BaseActivity` 的私有实现，子类不能覆盖。无需框架
+语言能力的页面可以直接继承 `AppCompatActivity`；若整个项目都不需要，应在自己的模板
+分支中为 BaseActivity 增加开关，再由子类覆盖该开关。
 
 ### Q4: 如何让 WebSocket 自动连接？
-在 Application.onCreate 或登录成功后：
+
+框架不会在启动时擅自建立连接。登录成功且服务器地址已确定后主动调用：
+
 ```kotlin
 Framework.getRepository().connectWebSocket(ip = "192.168.1.1", port = "8080")
 ```
 
+首次连接由业务触发；连接异常断开后的重连由 `WebSocketManager` 处理。页面或账号退出时
+调用 `disconnectWebSocket()`，避免继续重连。
+
 ### Q5: Token 失效如何跳转到登录页？
+
 在 Application.onCreate 中注入：
+
 ```kotlin
 Framework.setOnTokenExpired {
-    // 跳转到登录页
-    startActivity(Intent(this, LoginActivity::class.java))
+    Handler(Looper.getMainLooper()).post {
+        val intent = Intent(this, LoginActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        }
+        startActivity(intent)
+    }
 }
 ```
 
-### Q6: Release 模式如何配置 SSL 证书？
+回调可能从 OkHttp 工作线程触发，因此导航前要切到主线程。当前实现会清除 Token 并通知
+业务，不包含自动刷新 Token。
+
+### Q6: 如何配置自定义 SSL 证书？
+
 1. 将证书文件放到 `app/src/main/res/raw/my_cert.crt`
 2. `FrameworkConfig.sslCertRawResId = R.raw.my_cert`
 
@@ -166,17 +243,24 @@ Framework.setOnTokenExpired {
 `sslCertRawResId` 提供可信证书，不建议关闭证书或主机名校验。
 
 ### Q7: 如何添加自定义数据库实体？
-在 `app/src/main/java/com/mycompany/myapp/data/db/` 下创建：
+
+业务数据库建议在 App 模块独立定义，避免业务迁移和框架示例表绑定：
+
 ```kotlin
 @Database(
-    entities = [...],
-    version = 2,
-    exportSchema = false
+    entities = [MyEntity::class],
+    version = 1,
+    exportSchema = true,
 )
-abstract class AppDatabase : FrameworkDatabase() {
+abstract class AppDatabase : RoomDatabase() {
     abstract fun myDao(): MyDao
 }
 ```
+
+使用 `Room.databaseBuilder(context, AppDatabase::class.java, "app.db")` 创建并缓存实例。
+如果业务确实需要复用 `FrameworkDatabase` 的三张示例表，则继承它，并在 App 的
+`@Database.entities` 中显式列出框架实体和业务实体；同时必须使用 `AppDatabase::class.java`
+创建独立实例，不能继续调用 `FrameworkDatabase.getDatabase()`。
 
 ### Q8: 如何启用平板 kiosk 全屏？
 
@@ -187,7 +271,24 @@ abstract class AppDatabase : FrameworkDatabase() {
 FullScreenUtils.enableFullScreen(this)
 ```
 
+### Q9: Android Studio 提示 Gradle JVM 25 不兼容怎么办？
+
+Gradle 8.13 支持的运行 JVM 上限是 23，而本项目固定使用 JDK 17。打开 Android Studio
+的 **Settings/Preferences > Build, Execution, Deployment > Build Tools > Gradle**，将
+**Gradle JDK** 改成 `jbr-17` 或已安装的 JDK 17，然后重新 Sync。
+
+可用以下命令核对：
+
+```bash
+./gradlew --version
+```
+
+`settings.gradle.kts` 中的 Foojay resolver 用于解析或下载缺失的 daemon toolchain，
+它要等 Gradle 启动后才会执行，因此不能修复“Android Studio 先用 JDK 25 启动 Gradle”
+这一阶段的错误。
+
 ---
+
 ## 其他：工具链版本兼容与升级
 
 Android 工具链不是所有版本都可以独立升级。建议先确定 Android Studio/AGP，再确定
@@ -302,4 +403,3 @@ android {
 
 不要只把 `targetSdk` 从 36 改成 37。主版本工具链升级建议在独立分支中完成，验证
 通过后再合并到模板主分支。
-

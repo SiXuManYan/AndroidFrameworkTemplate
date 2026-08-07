@@ -104,7 +104,8 @@ class NumberStepperView @JvmOverloads constructor(
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
 
-        context.obtainStyledAttributes(attrs, R.styleable.FwNumberStepperView).use { array ->
+        val array = context.obtainStyledAttributes(attrs, R.styleable.FwNumberStepperView)
+        try {
             minValue = array.getInt(R.styleable.FwNumberStepperView_fw_stepper_min_value, 0)
             maxValue = array.getInt(
                 R.styleable.FwNumberStepperView_fw_stepper_max_value,
@@ -126,6 +127,8 @@ class NumberStepperView @JvmOverloads constructor(
                 R.styleable.FwNumberStepperView_fw_stepper_value,
                 minValue
             ).coerceIn(minValue, maxValue)
+        } finally {
+            array.recycle()
         }
 
         addView(decrementButton, LayoutParams(dp(40), dp(40)))

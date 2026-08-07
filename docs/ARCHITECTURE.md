@@ -1,5 +1,9 @@
 # 架构说明
 
+本项目采用 `:app` + `:core_framework` 的单向模块依赖。框架层提供 Android 基础能力和
+示例数据契约，业务 UI、业务状态、导航、依赖注入及具体服务端接口由 App 或后续
+feature module 持有。模板支持 MVVM，但不会强制某一种业务架构实现。
+
 ## 整体分层
 
 ```mermaid
@@ -16,8 +20,11 @@ flowchart TB
         subgraph ui_base["ui/base/"]
             UI["BaseActivity / BaseFragment<br/>BaseDialog / BaseDialogFragment<br/>CommonAdapter / MultiViewTypeAdapter"]
         end
+        subgraph ui_components["ui/widget + ui/recyclerview + ui/dialog"]
+            UIC["Flow / Rating / Stepper<br/>Pager Snap / Divider / Loading"]
+        end
         subgraph api["api/"]
-            AS["ApiService + ApiResponse"]
+            AS["ApiService + ApiResponse<br/>EmptyBodyConverterFactory"]
             NM["NetworkModule"]
             IC["Interceptors<br/>Token / Auth / Version / Logging"]
         end
@@ -34,7 +41,7 @@ flowchart TB
             FR["FrameworkRepository<br/>(ApiService 按 IP:Port 缓存)"]
         end
         subgraph util["util/"]
-            UT["TimberUtil / DeviceUtils<br/>ScreenUtil / LanguageUtils<br/>FullScreenUtils / TimeUtils ..."]
+            UT["Decimal / String Number / App Info<br/>Device / Screen / Language / Time<br/>System Bar / Full Screen / View Extensions"]
         end
         subgraph const["constants/"]
             FC["FrameworkConstants"]
@@ -44,12 +51,19 @@ flowchart TB
     App -->|依赖| CF
     FWK --> PM
     FWK --> FR
-    FR --> AS
+    FR --> NM
     FR --> WSM
-    AS --> IC
-    IC --> NM
+    NM --> AS
+    NM --> IC
     WSM --> NM
 ```
+
+关键边界：
+
+- `:app` 可以依赖 `:core_framework`，框架层不得反向引用 App 的 `BuildConfig`、资源或业务类型。
+- `Framework.init()` 只负责日志、偏好管理和 Repository，不会自动打开数据库或连接 WebSocket。
+- Room 数据库、Retrofit Service 和 WebSocket 都按使用时机创建，业务负责决定其生命周期。
+- `ApiService`、生产模型和默认 Room 实体是示例契约；接入真实项目时可替换或移到业务层。
 
 ## 各模块职责
 
@@ -66,6 +80,7 @@ flowchart TB
 - **`VersionInterceptor`** - 自动注入 `VersionCode` / `VersionName` Header
 - **`HttpLoggingInterceptor`** - 详细打印请求/响应 Header 与 Body
 - **`ApiResponse<T>`** - 统一响应包装（`code` / `msg` / `data`）
+- **`EmptyBodyConverterFactory`** - 可选的 Retrofit 空 Body 转换器，默认 NetworkModule 未注册
 - **`FrameworkConfig`** - 运行时配置（debug、versionCode、SSL 策略等）
 
 ### 3. websocket（WebSocket 管理）
@@ -76,12 +91,14 @@ flowchart TB
 ### 4. database（Room 模板）
 - **`FrameworkDatabase`** - 默认包含 ProductHistory + Line + LinePosition（一对多示例）
 - **`ProductHistoryDao` / `LineDao`** - CRUD + Flow 自动刷新
-- 业务可继承 `FrameworkDatabase` 扩展自己的实体与 DAO
+- 默认启用 `fallbackToDestructiveMigration`，示例阶段升级会清表，生产项目必须定义迁移策略
+- 业务数据库建议在 App 独立定义；确需继承时必须显式声明全部实体并创建 AppDatabase 实例
 
 ### 5. datastore（偏好设置）
 - **`PreferencesManager`** - 通用 Key（IP / Port / Token / Language）
 - **`DataStoreBackupHelper`** - DataStore + SharedPreferences 双写双读模式
-- 业务可继承 `PreferencesManager` 添加自定义 Key
+- 框架 DataStore 名固定为 `framework_preferences`，自定义 Key 建议放入 App 自己的 DataStore
+- `FrameworkConfig.dataStoreName` 当前只参与默认 Room 数据库名派生，不会更改 DataStore 名
 
 ### 6. repository（仓库层）
 - **`FrameworkRepository`** - ApiService 缓存（按 IP:Port 缓存）+ WebSocket 委托 + 3 个示例 API
@@ -95,9 +112,23 @@ flowchart TB
 - **`CommonAdapter<T, VB>`** - 单一 ViewBinding 适配器
 - **`MultiViewTypeAdapter<T>`** - 多 ViewBinding 适配器
 
-### 8. util（工具类）
+### 8. ui/widget、ui/recyclerview、ui/dialog（可复用组件）
+
+- **`FlowLayout`** - 支持间距、最大行数和 RTL 的流式布局
+- **`RatingStarView`** - 支持半星、只读、RTL 和状态恢复的评分控件
+- **`NumberStepperView`** - 支持上下限、步长和回调的整数步进器
+- **`GridPagerSnapHelper`** - RecyclerView 固定行列分页吸附
+- **`DividerItemDecoration`** - 横向/纵向列表分割线
+- **`LoadingDialog`** - 复用 BaseDialog 约定的加载弹窗
+
+组件属性、代码示例和资源约定见 [可复用组件说明](./REUSABLE_COMPONENTS.md)。
+
+### 9. util（工具类）
+
 - `TimberUtil` - Debug/Release 日志分流
 - `DeviceUtils` - IP / SN / 大小写转换
+- `AppInfoUtils` - 版本信息和系统拨号器
+- `DecimalUtils` / `StringNumberExtensions` - 十进制运算与安全数值转换
 - `ScreenUtil` - dp/px/sp 互转
 - `LanguageUtils` - 中英文切换 + 淡入动画
 - `SystemBarUtils` - 通用 edge-to-edge 与安全区域适配
@@ -106,7 +137,8 @@ flowchart TB
 - `EditTextExtensions` - `requestFocusSafely` / `keepFocus` / `setShowSoftInputOnFocus`
 - `TimeUtils` - 时间格式化
 
-### 9. constants（常量）
+### 10. constants（常量）
+
 - `FrameworkConstants` - 超时 / Header 名称 / DataStore Key / 数据库名
 
 ## 核心流程

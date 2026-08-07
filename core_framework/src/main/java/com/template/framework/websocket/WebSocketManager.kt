@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
  * WebSocket 管理器（单例）
  *
  * 特性：
- * - 自动重连（指数退避可定制）
+ * - 异常断线后按固定间隔自动重连
  * - 状态 / 消息以 [StateFlow] 形式暴露，方便 ViewModel 收集
  * - 复用 NetworkModule 的 SSL 配置（HTTPS / WSS 共享）
  * - 同一服务器多次调用 connect 不会重复连接
