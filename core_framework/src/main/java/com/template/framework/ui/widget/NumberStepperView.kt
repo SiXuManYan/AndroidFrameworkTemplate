@@ -1,0 +1,244 @@
+package com.template.framework.ui.widget
+
+import android.content.Context
+import android.content.res.ColorStateList
+import android.os.Parcel
+import android.os.Parcelable
+import android.util.AttributeSet
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.View
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.LinearLayout
+import androidx.annotation.IntRange
+import androidx.appcompat.content.res.AppCompatResources
+import androidx.appcompat.widget.AppCompatImageButton
+import androidx.appcompat.widget.AppCompatTextView
+import androidx.core.view.ViewCompat
+import androidx.core.widget.ImageViewCompat
+import com.template.framework.R
+
+/**
+ * A business-agnostic integer stepper extracted from WhereRebirth's NumberView2.
+ *
+ * The value is always clamped to [minValue]..[maxValue]. Programmatic updates do
+ * not notify [onValueChangeListener] unless [setValue] is called with `notify = true`.
+ */
+class NumberStepperView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : LinearLayout(context, attrs, defStyleAttr) {
+
+    enum class Change { INCREMENT, DECREMENT, PROGRAMMATIC }
+
+    fun interface OnValueChangeListener {
+        fun onValueChanged(
+            view: NumberStepperView,
+            oldValue: Int,
+            newValue: Int,
+            change: Change
+        )
+    }
+
+    private val decrementButton = createButton(
+        R.drawable.framework_ic_remove_24,
+        R.string.framework_decrease
+    )
+    private val valueText = AppCompatTextView(context).apply {
+        gravity = Gravity.CENTER
+        minWidth = dp(40)
+        setPadding(dp(8), 0, dp(8), 0)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+        setTextColor(resolveColor(android.R.attr.textColorPrimary))
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+    }
+    private val incrementButton = createButton(
+        R.drawable.framework_ic_add_24,
+        R.string.framework_increase
+    )
+
+    var onValueChangeListener: OnValueChangeListener? = null
+
+    var minValue: Int = 0
+        set(value) {
+            require(value <= maxValue) { "minValue must be less than or equal to maxValue" }
+            field = value
+            setValueInternal(currentValue, Change.PROGRAMMATIC, notify = false)
+        }
+
+    var maxValue: Int = Int.MAX_VALUE
+        set(value) {
+            require(value >= minValue) { "maxValue must be greater than or equal to minValue" }
+            field = value
+            setValueInternal(currentValue, Change.PROGRAMMATIC, notify = false)
+        }
+
+    @setparam:IntRange(from = 1)
+    var step: Int = 1
+        set(value) {
+            require(value > 0) { "step must be greater than zero" }
+            field = value
+        }
+
+    var hideValueAtMin: Boolean = false
+        set(value) {
+            field = value
+            updateViews()
+        }
+
+    var showDecrementAtMin: Boolean = false
+        set(value) {
+            field = value
+            updateViews()
+        }
+
+    var value: Int
+        get() = currentValue
+        set(value) = setValue(value, notify = false)
+
+    private var currentValue: Int = 0
+
+    init {
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+
+        context.obtainStyledAttributes(attrs, R.styleable.FwNumberStepperView).use { array ->
+            minValue = array.getInt(R.styleable.FwNumberStepperView_fw_stepper_min_value, 0)
+            maxValue = array.getInt(
+                R.styleable.FwNumberStepperView_fw_stepper_max_value,
+                Int.MAX_VALUE
+            )
+            require(minValue <= maxValue) {
+                "fw_stepper_min_value must be less than or equal to fw_stepper_max_value"
+            }
+            step = array.getInt(R.styleable.FwNumberStepperView_fw_stepper_step, 1)
+            hideValueAtMin = array.getBoolean(
+                R.styleable.FwNumberStepperView_fw_stepper_hide_value_at_min,
+                false
+            )
+            showDecrementAtMin = array.getBoolean(
+                R.styleable.FwNumberStepperView_fw_stepper_show_decrement_at_min,
+                false
+            )
+            currentValue = array.getInt(
+                R.styleable.FwNumberStepperView_fw_stepper_value,
+                minValue
+            ).coerceIn(minValue, maxValue)
+        }
+
+        addView(decrementButton, LayoutParams(dp(40), dp(40)))
+        addView(valueText, LayoutParams(LayoutParams.WRAP_CONTENT, dp(40)))
+        addView(incrementButton, LayoutParams(dp(40), dp(40)))
+
+        decrementButton.setOnClickListener {
+            val next = (currentValue.toLong() - step).coerceAtLeast(minValue.toLong()).toInt()
+            setValueInternal(next, Change.DECREMENT, notify = true)
+        }
+        incrementButton.setOnClickListener {
+            val next = (currentValue.toLong() + step).coerceAtMost(maxValue.toLong()).toInt()
+            setValueInternal(next, Change.INCREMENT, notify = true)
+        }
+        updateViews()
+    }
+
+    fun setValue(value: Int, notify: Boolean = false) {
+        setValueInternal(value, Change.PROGRAMMATIC, notify)
+    }
+
+    override fun setEnabled(enabled: Boolean) {
+        super.setEnabled(enabled)
+        updateViews()
+    }
+
+    override fun onSaveInstanceState(): Parcelable {
+        return SavedState(super.onSaveInstanceState()).also { it.value = currentValue }
+    }
+
+    override fun onRestoreInstanceState(state: Parcelable?) {
+        if (state !is SavedState) {
+            super.onRestoreInstanceState(state)
+            return
+        }
+        super.onRestoreInstanceState(state.superState)
+        setValue(state.value, notify = false)
+    }
+
+    private fun setValueInternal(value: Int, change: Change, notify: Boolean) {
+        val boundedValue = value.coerceIn(minValue, maxValue)
+        val oldValue = currentValue
+        currentValue = boundedValue
+        updateViews()
+        if (notify && oldValue != boundedValue) {
+            onValueChangeListener?.onValueChanged(this, oldValue, boundedValue, change)
+        }
+    }
+
+    private fun updateViews() {
+        val atMin = currentValue <= minValue
+        val atMax = currentValue >= maxValue
+        valueText.text = currentValue.toString()
+        valueText.visibility = if (hideValueAtMin && atMin) INVISIBLE else VISIBLE
+        decrementButton.visibility = if (!showDecrementAtMin && atMin) INVISIBLE else VISIBLE
+        decrementButton.isEnabled = isEnabled && !atMin
+        incrementButton.isEnabled = isEnabled && !atMax
+        decrementButton.alpha = if (decrementButton.isEnabled) 1f else 0.38f
+        incrementButton.alpha = if (incrementButton.isEnabled) 1f else 0.38f
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            stateDescription = currentValue.toString()
+        }
+    }
+
+    private fun createButton(drawableRes: Int, contentDescriptionRes: Int): ImageButton {
+        return AppCompatImageButton(context).apply {
+            setImageResource(drawableRes)
+            contentDescription = context.getString(contentDescriptionRes)
+            scaleType = ImageView.ScaleType.CENTER
+            background = resolveSelectableBackground()
+            ImageViewCompat.setImageTintList(this, resolveColor(android.R.attr.textColorPrimary))
+            minimumWidth = dp(40)
+            minimumHeight = dp(40)
+        }
+    }
+
+    private fun resolveSelectableBackground() = TypedValue().let { value ->
+        context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, value, true)
+        AppCompatResources.getDrawable(context, value.resourceId)
+    }
+
+    private fun resolveColor(attribute: Int): ColorStateList {
+        val value = TypedValue()
+        check(context.theme.resolveAttribute(attribute, value, true)) {
+            "Theme attribute $attribute is required"
+        }
+        return if (value.resourceId != 0) {
+            AppCompatResources.getColorStateList(context, value.resourceId)
+                ?: ColorStateList.valueOf(value.data)
+        } else {
+            ColorStateList.valueOf(value.data)
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
+
+    private class SavedState : BaseSavedState {
+        var value: Int = 0
+
+        constructor(superState: Parcelable?) : super(superState)
+
+        private constructor(source: Parcel) : super(source) {
+            value = source.readInt()
+        }
+
+        override fun writeToParcel(out: Parcel, flags: Int) {
+            super.writeToParcel(out, flags)
+            out.writeInt(value)
+        }
+
+        companion object CREATOR : Parcelable.Creator<SavedState> {
+            override fun createFromParcel(source: Parcel) = SavedState(source)
+            override fun newArray(size: Int): Array<SavedState?> = arrayOfNulls(size)
+        }
+    }
+}
