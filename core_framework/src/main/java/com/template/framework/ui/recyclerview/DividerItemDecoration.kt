@@ -13,6 +13,14 @@ import kotlin.math.roundToInt
  *
  * [startPaddingPx] and [endPaddingPx] apply to the divider's cross axis: left/right for a
  * vertical list and top/bottom for a horizontal list. All dimensions are pixels.
+ * - 中文：支持横向和纵向列表；所有尺寸参数单位均为像素。
+ *
+ * @param color divider color
+ * @param thicknessPx divider thickness in pixels
+ * @param orientation [RecyclerView.VERTICAL] or [RecyclerView.HORIZONTAL]
+ * @property drawLastItem whether a divider is drawn after the final adapter item
+ * @param startPaddingPx padding at the cross-axis start edge
+ * @param endPaddingPx padding at the cross-axis end edge
  */
 class DividerItemDecoration(
     @ColorInt color: Int,

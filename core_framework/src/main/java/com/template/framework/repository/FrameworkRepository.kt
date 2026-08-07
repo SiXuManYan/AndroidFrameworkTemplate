@@ -16,20 +16,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
 /**
- * 框架仓库（单例）
+ * Coordinates server preferences, the cached sample API, and the shared WebSocket manager.
  *
- * 负责：
- * 1. ApiService 缓存管理（按 (IP, Port) 缓存，配置变化时重建）
- * 2. WebSocket 连接/断开/消息发送
- * 3. 暴露 PreferencesManager 委托方法
- * 4. 暴露默认的 3 个示例 API
+ * [com.template.framework.Framework] owns one default instance, while App repositories may extend
+ * this class. [getApiService] caches by server IP and port and rebuilds when either value changes.
  *
- * ## ApiService 缓存策略
- * - 首次调用 [getApiService] 时从 [PreferencesManager] 读取当前 IP/Port，创建 ApiService
- * - 后续调用若 IP/Port 未变化，直接复用缓存实例
- * - IP/Port 变化或调用 [clearApiServiceCache] 时，下次调用会重新创建
+ * - 中文：统一协调服务器配置、HTTP Service 缓存与 WebSocket；默认 Service 按 IP/端口缓存。
  *
- * ## 自定义 ApiService
+ * ## Custom service
  * ```kotlin
  * interface MyApi {
  *     @GET("custom") suspend fun getCustom(): ApiResponse<MyData>
@@ -37,12 +31,16 @@ import kotlinx.coroutines.flow.first
  *
  * // 在自己的 Repository 中：
  * class MyRepository(...) : FrameworkRepository(...) {
- *     private suspend fun myApi(): MyApi = NetworkModule.createApiService<MyApi>(currentBaseUrl(), getToken, clearToken)
+ *     private suspend fun myApi(): MyApi = NetworkModule.createApiService(
+ *         baseUrl = getCurrentBaseUrl(),
+ *         getToken = { accessToken.first() },
+ *         clearToken = { clearAccessToken() },
+ *     )
  * }
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @param context any context; only its application context is retained
+ * @property preferencesManager preference source used by HTTP and WebSocket operations
  */
 open class FrameworkRepository(
     context: Context,
@@ -55,12 +53,15 @@ open class FrameworkRepository(
 
     // region [缓存配置]
 
+    /** Cached default service for subclasses that need to inspect or invalidate it. */
     @Volatile
     protected var cachedApiService: ApiService? = null
 
+    /** Server IP associated with [cachedApiService]. */
     @Volatile
     protected var cachedServerIp: String? = null
 
+    /** Server port associated with [cachedApiService]. */
     @Volatile
     protected var cachedServerPort: String? = null
 
@@ -70,7 +71,8 @@ open class FrameworkRepository(
 
     companion object {
         /**
-         * Token 失效全局回调，由 [com.template.framework.Framework.setOnTokenExpired] 注入
+         * Process-wide expired-token callback installed by
+         * [com.template.framework.Framework.setOnTokenExpired].
          */
         @Volatile
         var onTokenExpiredCallback: (() -> Unit)? = null
@@ -83,7 +85,10 @@ open class FrameworkRepository(
     // region [ApiService 缓存管理]
 
     /**
-     * 获取 ApiService 实例（带缓存）
+     * Returns the default [ApiService] for the currently persisted server.
+     *
+     * The service is reused while IP and port remain unchanged. Token lookup is dynamic and occurs
+     * per request, so saving a new token does not require cache invalidation.
      */
     suspend fun getApiService(): ApiService {
         val currentIp = preferencesManager.serverIp.first()
@@ -103,17 +108,19 @@ open class FrameworkRepository(
         return cachedApiService!!
     }
 
-    /**
-     * 清除 ApiService 缓存（IP/Port 改变后调用，下次 getApiService 会重建）
-     */
+    /** Invalidates the default API cache; the next [getApiService] call rebuilds it. */
     fun clearApiServiceCache() {
         cachedApiService = null
     }
 
     /**
-     * 构建基础 URL
-     * - Debug 模式：http://{ip}:{port}/{debugApiPrefix}/
-     * - Release 模式：https://{ip}:{port}/{releaseApiPrefix}/
+     * Builds the configured HTTP base URL.
+     *
+     * Debug uses `http://{ip}:{port}/{debugApiPrefix}/`; release uses
+     * `https://{ip}:{port}/{releaseApiPrefix}/`.
+     *
+     * @param ip host or IP without a scheme
+     * @param port server port
      */
     protected fun buildBaseUrl(ip: String, port: String): String {
         val config = com.template.framework.Framework.getConfig()
@@ -122,9 +129,7 @@ open class FrameworkRepository(
         return "$scheme$ip:$port/$apiPrefix/"
     }
 
-    /**
-     * 获取当前 BaseUrl（用于自定义 ApiService）
-     */
+    /** Returns a base URL built from the latest persisted server values. */
     suspend fun getCurrentBaseUrl(): String {
         val ip = preferencesManager.serverIp.first()
         val port = preferencesManager.serverPort.first()
@@ -135,37 +140,45 @@ open class FrameworkRepository(
 
     // region [PreferencesManager 委托]
 
+    /** Delegated stream of the current server IP. */
     val serverIp: Flow<String> = preferencesManager.serverIp
+
+    /** Delegated stream of the current server port. */
     val serverPort: Flow<String> = preferencesManager.serverPort
+
+    /** Delegated stream of the current access token. */
     val accessToken: Flow<String?> = preferencesManager.accessToken
+
+    /** Delegated stream of the selected language code. */
     val language: Flow<String> = preferencesManager.language
 
+    /** Persists [ip]; [getApiService] rebuilds its cache when the value changes. */
     suspend fun saveServerIp(ip: String) = preferencesManager.saveServerIp(ip)
+
+    /** Persists [port]; [getApiService] rebuilds its cache when the value changes. */
     suspend fun saveServerPort(port: String) = preferencesManager.saveServerPort(port)
+
+    /** Persists [token] for subsequent authenticated requests. */
     suspend fun saveAccessToken(token: String) = preferencesManager.saveAccessToken(token)
+
+    /** Clears the persisted access token. */
     suspend fun clearAccessToken() = preferencesManager.clearAccessToken()
 
     // endregion
 
     // region [示例 API]
 
-    /**
-     * 示例 1：登录（POST + @Body + ApiResponse<LoginDataResponse>）
-     */
+    /** Sends the sample device-login request. */
     suspend fun login(request: DeviceLoginRequest): ApiResponse<LoginDataResponse> {
         return getApiService().deviceLogin(request)
     }
 
-    /**
-     * 示例 2：获取列表（GET + ApiResponse<List<T>>）
-     */
+    /** Returns the sample production-line list. */
     suspend fun getLineAndPost(): ApiResponse<List<LineAndPostResponse>> {
         return getApiService().getLineAndPost()
     }
 
-    /**
-     * 示例 3：保存数据（POST + @Body + ApiResponse<T>）
-     */
+    /** Saves the sample product payload. */
     suspend fun saveProducts(request: SaveProductsRequest): ApiResponse<SaveProductsResponse> {
         return getApiService().saveProducts(request)
     }
@@ -175,7 +188,14 @@ open class FrameworkRepository(
     // region [WebSocket 操作]
 
     /**
-     * 连接 WebSocket
+     * Starts a WebSocket connection.
+     *
+     * Missing [ip] or [port] values are read with `runBlocking`, so prefer passing explicit values
+     * or call this away from latency-sensitive UI work.
+     *
+     * @param ip optional host override; defaults to persisted server IP
+     * @param port optional port override; defaults to persisted server port
+     * @param snNumber optional device serial number sent in the handshake header
      */
     fun connectWebSocket(ip: String? = null, port: String? = null, snNumber: String? = null) {
         kotlinx.coroutines.runBlocking {
@@ -185,20 +205,26 @@ open class FrameworkRepository(
         }
     }
 
-    /**
-     * 断开 WebSocket
-     */
+    /** Closes the active WebSocket and disables automatic reconnect. */
     fun disconnectWebSocket() = webSocketManager.disconnect()
 
     /**
-     * 发送 WebSocket 消息
+     * Sends [message] through the active socket.
+     *
+     * @return `false` when no active socket can accept the message
      */
     fun sendWebSocketMessage(message: String) = webSocketManager.sendMessage(message)
 
-    /** WebSocket 连接状态 */
+    /**
+     * Current WebSocket connection state.
+     * - 中文：WebSocket 当前连接状态。
+     */
     val webSocketConnectionState = webSocketManager.connectionState
 
-    /** WebSocket 消息流 */
+    /**
+     * Most recent WebSocket message represented as text.
+     * - 中文：最近收到的文本化消息。
+     */
     val webSocketMessageFlow = webSocketManager.messageFlow
 
     // endregion

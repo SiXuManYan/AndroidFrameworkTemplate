@@ -10,13 +10,11 @@ import androidx.appcompat.app.AppCompatActivity
 import java.util.Locale
 
 /**
- * 语言工具类
+ * Applies the framework's Chinese/English locale selection and transition state.
  *
- * - 提供中/英文切换能力
- * - 通过 [setLanguageSwitchingFlag] / [isLanguageSwitching] 控制「语言切换后淡入动画」标记
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * [setLanguageSwitchingFlag] and [isLanguageSwitching] coordinate a short fade after screen
+ * recreation.
+ * - 中文：处理中英文 Locale 及语言切换后的淡入状态。
  */
 object LanguageUtils {
 
@@ -27,10 +25,15 @@ object LanguageUtils {
     private var isLanguageSwitching = false
 
     /**
-     * 设置应用语言
+     * Applies [language] to the supplied context resources where supported.
      *
-     * @param context 上下文
-     * @param language 语言代码，常用值："zh" / "en"
+     * Unknown codes use [Locale.getDefault]. Activities typically need recreation for every view
+     * to reflect the new locale. On Android 7.0+, this implementation updates an
+     * [AppCompatActivity] directly; for other context types it creates a localized context but
+     * cannot replace the caller's existing context.
+     *
+     * @param context Activity or other context whose resources should be updated
+     * @param language `zh`, `en`, or another value that falls back to the system locale
      */
     fun setLanguage(context: Context, language: String) {
         val locale = when (language) {
@@ -55,30 +58,23 @@ object LanguageUtils {
         }
     }
 
-    /**
-     * 标记正在进行语言切换（用于淡入动画）
-     */
+    /** Marks the next compatible screen creation as part of a language switch. */
     fun setLanguageSwitchingFlag() {
         isLanguageSwitching = true
     }
 
-    /**
-     * 清除语言切换标记
-     */
+    /** Clears the process-wide language transition marker. */
     fun clearLanguageSwitchingFlag() {
         isLanguageSwitching = false
     }
 
-    /**
-     * 是否正在进行语言切换
-     */
+    /** Returns whether a language transition animation is pending or running. */
     fun isLanguageSwitching(): Boolean = isLanguageSwitching
 
     /**
-     * 提供一个标准的淡入动画
-     * - duration = 200ms
-     * - alpha: 0 -> 1
-     * - 动画结束后自动清除 [isLanguageSwitching] 标记
+     * Fades [rootView] from transparent to opaque over 200 ms.
+     *
+     * Completion clears the transition marker before invoking [onEnd].
      */
     fun applyFadeInAnimation(rootView: android.view.View, onEnd: (() -> Unit)? = null) {
         rootView.alpha = 0f

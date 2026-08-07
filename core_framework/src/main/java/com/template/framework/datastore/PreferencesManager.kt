@@ -13,37 +13,24 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 
 /**
- * 框架默认的 DataStore 实例
+ * Framework-owned DataStore whose file name is fixed at compile time.
  *
- * 注：DataStore 名称在编译期固定为 "framework_preferences"。
- * 业务需要不同名称时，可在自己的模块中创建独立的 Manager，
- * 通过相同的方式使用 `preferencesDataStore` 委托。
+ * Business preferences should use a separate DataStore in the App module.
  */
 private val Context.frameworkDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "framework_preferences"
 )
 
 /**
- * Preferences 管理器
+ * Manages framework connection, authentication, and language preferences.
  *
- * 框架默认提供 4 个通用 Key：
- * - [serverIp]   - 服务器 IP
- * - [serverPort] - 服务器端口
- * - [accessToken] - 访问令牌
- * - [language]   - 语言
+ * Values are mirrored by [DataStoreBackupHelper]. Prefer the exposed [Flow] properties and suspend
+ * setters. The `*Sync` methods use `runBlocking` and should be limited to startup code that cannot
+ * collect asynchronously.
  *
- * 业务可在自己的 Manager 中继承或包装此类，添加自定义 Key。
+ * - 中文：管理服务器、Token 和语言配置；优先使用 Flow 与挂起函数，同步读取会阻塞线程。
  *
- * ## DataStore + SharedPreferences 双写双读
- * 通过 [DataStoreBackupHelper] 实现，防止 DataStore 异常导致配置丢失。
- *
- * ## 同步访问
- * 部分场景（如 Activity.onCreate）需要同步获取值，
- * 可调用 [getServerIpSync] / [getServerPortSync] / [getAccessTokenSync] /
- * [getLanguageSync]（内部使用 runBlocking，谨慎使用）。
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * @param context any context; only its application context is retained
  */
 open class PreferencesManager(context: Context) {
 
@@ -62,61 +49,66 @@ open class PreferencesManager(context: Context) {
 
     // region [Server IP]
 
-    /** 服务器 IP（Flow，默认为空字符串） */
+    /** Observes the server IP; emits an empty string when unset. */
     val serverIp: Flow<String> = backup.getStringFlow(SERVER_IP, "")
         .map { it ?: "" }
         .distinctUntilChanged()
 
-    /**
-     * 同步读取服务器 IP
-     * 内部使用 runBlocking，应仅在确实需要同步访问时使用（如 Activity.onCreate）
-     */
+    /** Returns the server IP while blocking the caller until the first value is available. */
     fun getServerIpSync(): String = runBlocking { backup.getString(SERVER_IP, "") ?: "" }
 
-    /** 保存服务器 IP */
+    /** Persists [ip] to DataStore and its backup. */
     suspend fun saveServerIp(ip: String) = backup.putString(SERVER_IP, ip)
 
     // endregion
 
     // region [Server Port]
 
+    /** Observes the server port; emits an empty string when unset. */
     val serverPort: Flow<String> = backup.getStringFlow(SERVER_PORT, "")
         .map { it ?: "" }
         .distinctUntilChanged()
 
+    /** Returns the server port while blocking the caller. */
     fun getServerPortSync(): String = runBlocking { backup.getString(SERVER_PORT, "") ?: "" }
 
+    /** Persists [port] to DataStore and its backup. */
     suspend fun saveServerPort(port: String) = backup.putString(SERVER_PORT, port)
 
     // endregion
 
     // region [Access Token]
 
+    /** Observes the access token; emits `null` when no authenticated session exists. */
     val accessToken: Flow<String?> = backup.getStringFlow(ACCESS_TOKEN).distinctUntilChanged()
 
+    /** Returns the access token while blocking the caller. */
     fun getAccessTokenSync(): String? = runBlocking { backup.getString(ACCESS_TOKEN) }
 
+    /** Persists the latest [token]. */
     suspend fun saveAccessToken(token: String) = backup.putString(ACCESS_TOKEN, token)
 
+    /** Removes the access token from both stores. */
     suspend fun clearAccessToken() = backup.remove(ACCESS_TOKEN)
 
     // endregion
 
     // region [Language]
 
+    /** Observes the selected language code; emits an empty string when unset. */
     val language: Flow<String> = backup.getStringFlow(LANGUAGE, "")
         .map { it ?: "" }
         .distinctUntilChanged()
 
+    /** Returns the selected language code while blocking the caller. */
     fun getLanguageSync(): String = runBlocking { backup.getString(LANGUAGE, "") ?: "" }
 
+    /** Persists a language code such as `zh` or `en`. */
     suspend fun saveLanguage(lang: String) = backup.putString(LANGUAGE, lang)
 
     // endregion
 
-    /**
-     * 清除所有框架 Key
-     */
+    /** Clears every framework-owned preference without touching App-owned DataStores. */
     suspend fun clearAll() {
         backup.remove(SERVER_IP)
         backup.remove(SERVER_PORT)

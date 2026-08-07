@@ -19,16 +19,15 @@ import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 
 /**
- * Activity 基类
+ * ViewBinding-based Activity foundation with edge-to-edge and language support.
  *
- * 提供能力：
- * - ViewBinding 生命周期管理（onCreate 初始化、onDestroy 置空）
- * - Edge-to-edge 系统栏适配（保留状态栏、导航栏并自动避让安全区域）
- * - 可选的系统返回键拦截
- * - 点击空白处关闭软键盘
- * - 语言设置同步应用（基于 [LanguageUtils] + [Framework.getPreferences]）
+ * The binding is created before [initView], then [initListener] and [initData] run in order.
+ * Touching outside a focused `EditText` hides the keyboard. System bars remain visible unless a
+ * subclass explicitly enables immersive mode through another utility.
  *
- * 使用示例：
+ * - 中文：统一管理 ViewBinding、系统栏、语言设置、键盘和初始化钩子。
+ *
+ * ## Usage
  * ```kotlin
  * class DemoActivity : BaseActivity<ActivityDemoBinding>() {
  *     override fun initViewBinding() = ActivityDemoBinding.inflate(layoutInflater)
@@ -36,24 +35,21 @@ import timber.log.Timber
  * }
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
 
     private var _binding: VB? = null
 
-    /**
-     * ViewBinding，仅在 onCreate ~ onDestroy 之间可用
-     */
+    /** Binding valid from `onCreate` completion until `onDestroy`. */
     protected val binding: VB
         get() = _binding ?: throw IllegalStateException(
             "Binding should not be accessed before onCreate or after onDestroy"
         )
 
     /**
-     * 是否启用全局返回键拦截
-     * 子类可重写：返回 false 即可恢复系统默认返回行为
+     * Whether this Activity consumes system back presses without finishing.
+     *
+     * Override with `true` only for screens that intentionally disable navigation back.
      */
     protected open val enableBackKeyInterceptor: Boolean = false
 
@@ -86,9 +82,7 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
         }
     }
 
-    /**
-     * 同步应用语言设置（在 onCreate 中调用）
-     */
+    /** Applies the persisted locale before `super.onCreate`; failures keep the system locale. */
     private fun applyLanguageSettingsSync() {
         runCatching {
             runBlocking {
@@ -100,9 +94,7 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
         }
     }
 
-    /**
-     * 语言切换后的淡入动画
-     */
+    /** Plays the short transition used after a language-triggered Activity recreation. */
     private fun applyFadeInAnimation() {
         val rootView = window.decorView.rootView
         rootView.alpha = 0f
@@ -125,9 +117,7 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
         _binding = null
     }
 
-    /**
-     * 点击空白处关闭软键盘
-     */
+    /** Hides the keyboard when a down event lands outside the focused `EditText`. */
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         if (ev?.action == MotionEvent.ACTION_DOWN) {
             val currentFocus = currentFocus
@@ -153,32 +143,22 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
-    /**
-     * 隐藏软键盘
-     */
+    /** Hides the soft keyboard using the Activity window token. */
     protected fun hideKeyboard() {
         val imm = ContextCompat.getSystemService(this, InputMethodManager::class.java)
         imm?.hideSoftInputFromWindow(window.decorView.windowToken, 0)
     }
 
-    /**
-     * 初始化 ViewBinding
-     */
+    /** Creates the binding used as this Activity's content view. */
     protected abstract fun initViewBinding(): VB
 
-    /**
-     * 初始化视图（子类实现）
-     */
+    /** Configures initial view state after the content view and window insets are ready. */
     protected open fun initView() {}
 
-    /**
-     * 初始化监听器（子类实现）
-     */
+    /** Registers UI listeners after [initView]. */
     protected open fun initListener() {}
 
-    /**
-     * 初始化数据（子类实现）
-     */
+    /** Starts initial data loading after [initListener]. */
     protected open fun initData() {}
 
     private companion object {

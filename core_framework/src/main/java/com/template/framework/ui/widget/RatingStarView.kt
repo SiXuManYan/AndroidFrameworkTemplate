@@ -22,19 +22,46 @@ import kotlin.math.min
 import kotlin.math.round
 import kotlin.math.sin
 
-/** A resource-free, Canvas-based rating control with half-star support. */
+/**
+ * Canvas-based rating control with whole-star and half-star input.
+ *
+ * The control supports RTL, accessibility range metadata, state restoration, and read-only mode.
+ * Programmatic changes report `fromUser = false` to [OnRatingChangeListener].
+ * - 中文：支持整星/半星、RTL、无障碍、状态恢复和只读模式的评分控件。
+ *
+ * ## Usage
+ * ```kotlin
+ * ratingView.apply {
+ *     stepSize = 0.5f
+ *     setOnRatingChangeListener { _, value, fromUser ->
+ *         if (fromUser) saveRating(value)
+ *     }
+ * }
+ * ```
+ *
+ * @param context view context
+ * @param attrs optional XML attributes
+ * @param defStyleAttr default style attribute
+ */
 class RatingStarView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
 ) : View(context, attrs, defStyleAttr) {
 
+    /** Receives rating changes from touch input and programmatic assignment. */
     fun interface OnRatingChangeListener {
+        /**
+         * @param view source rating view
+         * @param rating normalized rating in `0..starCount`
+         * @param fromUser `true` for touch input and `false` for programmatic updates
+         */
         fun onRatingChanged(view: RatingStarView, rating: Float, fromUser: Boolean)
     }
 
     private var currentRating: Float = 0f
 
+    /** Number of rendered stars; values below one normalize to one. */
     var starCount: Int = DEFAULT_STAR_COUNT
         set(value) {
             val normalized = value.coerceAtLeast(1)
@@ -46,13 +73,14 @@ class RatingStarView @JvmOverloads constructor(
             }
         }
 
+    /** Current normalized rating, clamped to `0..starCount`. */
     var rating: Float
         get() = currentRating
         set(value) {
             updateRating(value, fromUser = false, notify = true)
         }
 
-    /** Supported values are 0.5 and 1.0. Other values normalize to the nearest supported step. */
+    /** Supported values are `0.5` and `1.0`; other values normalize to the nearest step. */
     var stepSize: Float = 1f
         set(value) {
             val normalized = normalizeStep(value)
@@ -63,6 +91,7 @@ class RatingStarView @JvmOverloads constructor(
             }
         }
 
+    /** Fill color for the selected portion of each star. */
     @ColorInt
     var activeColor: Int = Color.rgb(255, 183, 0)
         set(value) {
@@ -73,6 +102,7 @@ class RatingStarView @JvmOverloads constructor(
             }
         }
 
+    /** Fill color for the unselected portion of each star. */
     @ColorInt
     var inactiveColor: Int = Color.rgb(232, 232, 232)
         set(value) {
@@ -83,6 +113,7 @@ class RatingStarView @JvmOverloads constructor(
             }
         }
 
+    /** Outline color around each star. */
     @ColorInt
     var strokeColor: Int = Color.rgb(160, 160, 160)
         set(value) {
@@ -93,6 +124,7 @@ class RatingStarView @JvmOverloads constructor(
             }
         }
 
+    /** Star outline width in pixels; non-finite or negative values normalize to zero. */
     var strokeWidth: Float = dp(1f)
         set(value) {
             val normalized = if (value.isFinite()) value.coerceAtLeast(0f) else 0f
@@ -103,6 +135,7 @@ class RatingStarView @JvmOverloads constructor(
             }
         }
 
+    /** Horizontal spacing between stars in pixels. */
     var starSpacing: Float = dp(4f)
         set(value) {
             val normalized = if (value.isFinite()) value.coerceAtLeast(0f) else 0f
@@ -113,6 +146,7 @@ class RatingStarView @JvmOverloads constructor(
             }
         }
 
+    /** Corner-path radius in pixels; zero keeps sharp star points. */
     var starCornerRadius: Float = 0f
         set(value) {
             val normalized = if (value.isFinite()) value.coerceAtLeast(0f) else 0f
@@ -123,6 +157,7 @@ class RatingStarView @JvmOverloads constructor(
             }
         }
 
+    /** Whether touch and accessibility click interaction can change [rating]. */
     var ratingEnabled: Boolean = true
         set(value) {
             if (field != value) {
@@ -209,6 +244,7 @@ class RatingStarView @JvmOverloads constructor(
         updatePathEffects()
     }
 
+    /** Replaces the rating listener; pass `null` to stop receiving changes. */
     fun setOnRatingChangeListener(listener: OnRatingChangeListener?) {
         ratingChangeListener = listener
     }

@@ -3,30 +3,22 @@ package com.template.framework.util
 import timber.log.Timber
 
 /**
- * Timber 日志工具类
+ * Installs the framework logging policy for Timber.
  *
- * - Debug：使用 [Timber.DebugTree] 输出到 Logcat
- * - Release：使用空 Tree，完全不输出，避免性能开销
- *
- * 由 [com.template.framework.Framework.init] 自动初始化，业务无需手动调用。
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * Debug builds use [Timber.DebugTree]; release builds install a no-op tree. Initialization is
+ * normally performed by [com.template.framework.Framework.init].
+ * - 中文：Debug 输出 Logcat，Release 丢弃日志。
  */
 object TimberUtil {
 
-    /**
-     * Release 模式下的空 Tree
-     */
+    /** Tree that intentionally discards release log messages. */
     private class ReleaseTree : Timber.Tree() {
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
             // Release 模式不输出
         }
     }
 
-    /**
-     * 初始化 Timber
-     */
+    /** Installs a debug or no-op tree according to [debug]. */
     fun init(debug: Boolean) {
         if (debug) {
             Timber.plant(Timber.DebugTree())

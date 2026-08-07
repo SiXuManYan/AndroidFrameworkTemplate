@@ -6,14 +6,22 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * 一对多子实体示例
+ * Child entity belonging to a sample [Line].
  *
- * 演示：
- * - `@ForeignKey` + `onDelete = CASCADE`：父记录删除时自动删除子记录
- * - `@Index`：提升外键查询性能
+ * Deleting the parent line cascades to its positions, and [lineId] is indexed for lookup.
+ * - 中文：产线删除时会级联删除工位记录。
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @property id position primary key
+ * @property lineId parent [Line.id]
+ * @property postId backend post identifier
+ * @property postCode post code
+ * @property postName display name
+ * @property enName optional English name
+ * @property startTime optional backend-formatted start time
+ * @property status optional status value
+ * @property remark optional remark
+ * @property delFlag optional soft-delete flag
+ * @property sortOrder display order within the parent line
  */
 @Entity(
     tableName = "line_position",

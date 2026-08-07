@@ -6,21 +6,21 @@ import okhttp3.Interceptor
 import okhttp3.Response
 
 /**
- * Token 拦截器
+ * Adds the default client identifier and optional bearer token to outgoing requests.
  *
- * 自动为每个请求添加：
- * 1. `clientid` Header（标识客户端类型，可被业务覆盖）
- * 2. `Authorization: Bearer {token}` Header（如果存在 token）
+ * Existing `clientid` and `Authorization` headers are preserved, allowing individual requests to
+ * override the defaults. Token lookup uses `runBlocking` on the OkHttp interceptor thread, so the
+ * provider should return promptly.
+ * - 中文：自动补充客户端标识和 Token，但不会覆盖请求中已经设置的同名 Header。
  *
- * 使用示例：
+ * ## Usage
  * ```kotlin
  * val tokenInterceptor = TokenInterceptor(
  *     getToken = { preferencesManager.accessToken.first() }
  * )
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @param getToken suspending provider queried for the latest token on each request
  */
 class TokenInterceptor(
     private val getToken: suspend () -> String?
@@ -50,10 +50,7 @@ class TokenInterceptor(
     }
 
     companion object {
-        /**
-         * 默认客户端 ID
-         * 业务可在创建 TokenInterceptor 时自行覆盖此值
-         */
+        /** Default client identifier used when a request does not provide `clientid`. */
         const val DEFAULT_CLIENT_ID = "428a8310cd442757ae699df5d894f051"
     }
 }

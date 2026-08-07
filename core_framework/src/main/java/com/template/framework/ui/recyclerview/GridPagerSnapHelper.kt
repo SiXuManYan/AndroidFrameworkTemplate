@@ -16,6 +16,10 @@ import kotlin.math.min
  *
  * The adapter must arrange each page as [rows] x [columns] contiguous items. This helper works
  * with either a horizontally or vertically scrolling LayoutManager.
+ * - 中文：将固定行列网格按页吸附，每页数据在 Adapter 中必须连续排列。
+ *
+ * @property rows number of rows per page; must be positive
+ * @property columns number of columns per page; must be positive
  */
 class GridPagerSnapHelper(
     val rows: Int,

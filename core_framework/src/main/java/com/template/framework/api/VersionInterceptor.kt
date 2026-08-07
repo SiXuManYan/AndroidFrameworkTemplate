@@ -6,17 +6,11 @@ import okhttp3.Interceptor
 import okhttp3.Response
 
 /**
- * 版本拦截器
+ * Adds `VersionCode` and `VersionName` headers from [FrameworkConfig].
  *
- * 自动为每个请求添加：
- * - `VersionCode` Header
- * - `VersionName` Header
- *
- * 版本号从 [com.template.framework.api.FrameworkConfig] 中读取，
- * 业务可在 Application.onCreate 中通过 Framework.init() 注入。
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * Existing headers are preserved. If the framework has not been initialized, the request proceeds
+ * without version headers instead of failing.
+ * - 中文：补充应用版本 Header；请求已设置同名 Header 时不会覆盖。
  */
 class VersionInterceptor : Interceptor {
 

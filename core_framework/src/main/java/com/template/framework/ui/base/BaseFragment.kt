@@ -10,14 +10,15 @@ import androidx.fragment.app.Fragment
 import androidx.viewbinding.ViewBinding
 
 /**
- * Fragment 基类
+ * ViewBinding-based Fragment foundation with ordered setup hooks.
  *
- * 提供能力：
- * - ViewBinding 生命周期管理
- * - 统一的生命周期钩子：initView / initListener / observeViewModel / initData
- * - 关闭软键盘辅助方法
+ * [initView], [initListener], [observeViewModel], and [initData] run in that order from
+ * `onViewCreated`. The binding is cleared in `onDestroyView`, allowing the Fragment instance to
+ * outlive its view safely.
  *
- * 使用示例：
+ * - 中文：统一管理 Fragment 的 ViewBinding 与视图初始化顺序。
+ *
+ * ## Usage
  * ```kotlin
  * class DemoFragment : BaseFragment<FragmentDemoBinding>() {
  *     override fun initViewBinding(inflater, container) = FragmentDemoBinding.inflate(inflater, container, false)
@@ -26,13 +27,12 @@ import androidx.viewbinding.ViewBinding
  * }
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 abstract class BaseFragment<VB : ViewBinding> : Fragment() {
 
     private var _binding: VB? = null
 
+    /** Binding valid only between `onCreateView` and `onDestroyView`. */
     protected val binding: VB
         get() = _binding ?: throw IllegalStateException(
             "Binding should not be accessed before onCreateView or after onDestroyView"
@@ -60,25 +60,29 @@ abstract class BaseFragment<VB : ViewBinding> : Fragment() {
         _binding = null
     }
 
+    /** Inflates or creates the binding for this Fragment view. */
     protected abstract fun initViewBinding(inflater: LayoutInflater, container: ViewGroup?): VB
 
+    /** Configures initial view state. */
     protected open fun initView() {}
+
+    /** Registers UI listeners after [initView]. */
     protected open fun initListener() {}
+
+    /** Starts lifecycle-aware observation after listeners are registered. */
     protected open fun observeViewModel() {}
+
+    /** Starts initial data loading after [observeViewModel]. */
     protected open fun initData() {}
 
-    /**
-     * 关闭软键盘
-     */
+    /** Hides the keyboard using the Fragment root view token, if the view exists. */
     protected fun hideKeyboard() {
         val view = view ?: return
         val imm = ContextCompat.getSystemService(requireContext(), InputMethodManager::class.java)
         imm?.hideSoftInputFromWindow(view.windowToken, 0)
     }
 
-    /**
-     * 通过指定 View 关闭软键盘
-     */
+    /** Hides the keyboard using [view]'s window token. */
     protected fun hideKeyboard(view: View) {
         val imm = ContextCompat.getSystemService(requireContext(), InputMethodManager::class.java)
         imm?.hideSoftInputFromWindow(view.windowToken, 0)

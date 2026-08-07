@@ -4,12 +4,11 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * 一对多父实体示例
+ * Parent entity in the sample one-to-many line relationship.
  *
- * 与 [LinePosition] 演示 `@ForeignKey` + `@Index` 的 Room 一对多关联。
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * @property id stable primary key referenced by [LinePosition.lineId]
+ * @property lineCode business-facing line code
+ * @property lineName display name
  */
 @Entity(tableName = "line")
 data class Line(

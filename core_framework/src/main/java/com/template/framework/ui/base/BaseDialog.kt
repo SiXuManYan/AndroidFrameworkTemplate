@@ -11,17 +11,17 @@ import com.template.framework.R
 import com.template.framework.util.FullScreenUtils
 
 /**
- * Dialog 基类
+ * Dialog foundation with optional immersive mode and outside-click handling.
  *
- * 提供能力：
- * - 可选的沉浸式全屏
- * - 点击外部空白区域时，先隐藏软键盘，再关闭（可通过 [enableOutsideDismiss] 关闭）
+ * ## Layout contract
+ * - `R.id.rootLayout` receives outside clicks.
+ * - `R.id.cardView`, when present, consumes clicks inside the dialog content.
  *
- * 布局要求：
- * - 根布局需要包含 id `R.id.rootLayout`（点击空白区域处理）
- * - 如果有卡片容器，需要 id `R.id.cardView`（阻止事件冒泡到 rootLayout）
+ * An outside click hides the keyboard first; a later click dismisses the dialog when
+ * [enableOutsideDismiss] is enabled.
+ * - 中文：外部点击会优先收起键盘，再按配置决定是否关闭弹窗。
  *
- * 使用示例：
+ * ## Usage
  * ```kotlin
  * class DemoDialog(context: Context) : BaseDialog(context) {
  *     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,15 +31,14 @@ import com.template.framework.util.FullScreenUtils
  * }
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @param context host context used by [Dialog]
  */
 abstract class BaseDialog(context: Context) : Dialog(context) {
 
-    /** 是否允许点击对话框外部时关闭 */
+    /** Whether an outside click may dismiss the dialog after the keyboard is hidden. */
     protected open val enableOutsideDismiss: Boolean = true
 
-    /** kiosk 场景可覆盖为 true；通用手机界面默认保留系统栏。 */
+    /** Whether [show] hides system bars for a kiosk-style experience. */
     protected open val enableImmersiveFullScreen: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,6 +73,7 @@ abstract class BaseDialog(context: Context) : Dialog(context) {
         return imm.isActive && window?.currentFocus is EditText
     }
 
+    /** Hides the keyboard and clears the currently focused dialog view. */
     protected fun hideKeyboard() {
         val imm = ContextCompat.getSystemService(context, InputMethodManager::class.java)
             ?: return

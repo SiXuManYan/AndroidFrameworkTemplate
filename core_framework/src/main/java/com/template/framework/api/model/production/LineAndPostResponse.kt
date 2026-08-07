@@ -3,13 +3,15 @@ package com.template.framework.api.model.production
 import com.google.gson.annotations.SerializedName
 
 /**
- * 列表数据响应示例
+ * Production line returned by the sample list endpoint.
  *
- * 用于演示 `@GET` 返回 `ApiResponse<List<T>>` 的用法。
- * 实际业务中可重命名为符合业务的实体，如 ProductResponse / OrderResponse 等。
+ * - 中文：用于演示 `ApiResponse<List<T>>` 以及嵌套工位列表的响应模型。
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @property id line identifier
+ * @property tenantId optional tenant identifier
+ * @property lineCode line code
+ * @property lineName display name
+ * @property linePositions positions belonging to this line
  */
 data class LineAndPostResponse(
     val id: String,
@@ -24,7 +26,19 @@ data class LineAndPostResponse(
 )
 
 /**
- * 列表元素的子项（演示一对多嵌套）
+ * Position nested under a [LineAndPostResponse].
+ *
+ * @property id position record identifier
+ * @property lineId parent line identifier
+ * @property postId backend post identifier
+ * @property postCode post code
+ * @property postName display name
+ * @property enName optional English display name
+ * @property startTime optional backend-formatted start time
+ * @property status optional status value
+ * @property remark optional free-form remark
+ * @property delFlag optional soft-delete flag
+ * @property sortOrder display order within the line
  */
 data class LinePosition(
     val id: Int,

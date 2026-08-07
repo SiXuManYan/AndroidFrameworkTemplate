@@ -9,18 +9,14 @@ import okhttp3.Response
 import timber.log.Timber
 
 /**
- * 认证错误拦截器
+ * Detects an expired access token from either HTTP `401` or JSON business code `401`.
  *
- * 同时处理两种 Token 失效场景：
- * 1. HTTP 401 Unauthorized
- * 2. HTTP 200 但响应体中 `code == 401`
+ * On expiry, [clearToken] runs first and [onTokenExpired] runs second. Both execute on the OkHttp
+ * interceptor thread; UI work must be dispatched to the main thread.
+ * - 中文：同时处理 HTTP 401 和业务码 401，并在清除本地 Token 后通知 App。
  *
- * 触发时：
- * 1. 调用 [clearToken] 清除本地 token
- * 2. 调用 [onTokenExpired] 通知 App 层跳转登录页
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * @param onTokenExpired callback that informs the App about the expired session
+ * @param clearToken suspending action that removes the persisted access token
  */
 class AuthErrorInterceptor(
     private val onTokenExpired: () -> Unit,

@@ -3,9 +3,11 @@ package com.template.framework.api.model
 import com.google.gson.annotations.SerializedName
 
 /**
- * API 统一响应封装
+ * Generic envelope for the sample backend response format.
  *
- * 后端约定的标准格式：
+ * - 中文：示例后端的统一响应结构。
+ *
+ * ## JSON shape
  * ```json
  * {
  *   "code": 200,
@@ -14,14 +16,15 @@ import com.google.gson.annotations.SerializedName
  * }
  * ```
  *
- * 使用示例：
+ * ## Usage
  * ```kotlin
  * @GET("user/info")
  * suspend fun getUserInfo(): ApiResponse<UserInfo>
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @property code backend business status code
+ * @property message human-readable backend message mapped from JSON field `msg`
+ * @property data nullable response payload
  */
 data class ApiResponse<T>(
     val code: Int,
@@ -29,17 +32,15 @@ data class ApiResponse<T>(
     val message: String,
     val data: T?
 ) {
-    /**
-     * 是否成功（code == 200）
-     */
+    /** `true` when [code] equals [SUCCESS_CODE]. */
     val isSuccess: Boolean
         get() = code == SUCCESS_CODE
 
     companion object {
-        /** 业务成功 code */
+        /** Business code used by the sample backend for success. */
         const val SUCCESS_CODE = 200
 
-        /** Token 失效 code（业务层 401） */
+        /** Business-level code used by the sample backend for an expired token. */
         const val TOKEN_EXPIRED_CODE = 401
     }
 }

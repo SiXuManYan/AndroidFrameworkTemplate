@@ -4,15 +4,12 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * 列表项实体示例 1
+ * Sample record of a product-processing event.
  *
- * 演示：
- * - `@Entity(tableName = ...)` 定义表名
- * - `@PrimaryKey(autoGenerate = true)` 自增主键
- * - 基本字段定义
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * @property id auto-generated Room primary key; keep `0` for new records
+ * @property productCode product identifier
+ * @property productName product display name
+ * @property startTime event start time in epoch milliseconds
  */
 @Entity(tableName = "product_history")
 data class ProductHistory(

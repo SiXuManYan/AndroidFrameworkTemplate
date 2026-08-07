@@ -8,17 +8,29 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 
-/** Reads package metadata for the current application. */
+/**
+ * Reads package metadata and opens safe system intents for the current application.
+ *
+ * - 中文：读取应用版本信息，并提供无需拨号权限的系统拨号器入口。
+ */
 object AppInfoUtils {
 
-    /** Creates a permission-free dialer intent without placing the call directly. */
+    /**
+     * Creates an `ACTION_DIAL` intent without placing a call directly.
+     *
+     * @param phoneNumber number shown in the system dialer
+     */
     @JvmStatic
     fun createDialIntent(phoneNumber: String): Intent = Intent(
         Intent.ACTION_DIAL,
         Uri.fromParts("tel", phoneNumber.trim(), null)
     )
 
-    /** Opens the system dialer when one is available. Blank numbers are rejected. */
+    /**
+     * Opens the system dialer when one is available.
+     *
+     * @return `false` for a blank number, missing handler, or launch failure
+     */
     @JvmStatic
     fun openDialer(context: Context, phoneNumber: String): Boolean {
         if (phoneNumber.isBlank()) return false
@@ -32,9 +44,11 @@ object AppInfoUtils {
         return runCatching { context.startActivity(intent) }.isSuccess
     }
 
+    /** Returns the app version name, or `null` when package metadata cannot be read. */
     @JvmStatic
     fun getVersionName(context: Context): String? = getPackageInfo(context)?.versionName
 
+    /** Returns the app version code as a `Long`, or `null` when metadata is unavailable. */
     @JvmStatic
     fun getVersionCode(context: Context): Long? {
         val packageInfo = getPackageInfo(context) ?: return null
@@ -46,6 +60,7 @@ object AppInfoUtils {
         }
     }
 
+    /** Returns package metadata for the current app, or `null` if lookup fails. */
     @JvmStatic
     fun getPackageInfo(context: Context): PackageInfo? {
         val appContext = context.applicationContext

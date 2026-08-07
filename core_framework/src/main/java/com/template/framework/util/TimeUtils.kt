@@ -1,18 +1,14 @@
 package com.template.framework.util
 
 /**
- * 时间格式化工具类
+ * Formats non-negative durations for compact UI display.
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * - 中文：将毫秒时长格式化为播放器常用的时间文本。
  */
 object TimeUtils {
 
     /**
-     * 将毫秒转换为时分秒格式
-     *
-     * - 小于 1 小时："MM:SS"
-     * - 大于等于 1 小时："HH:MM:SS"
+     * Formats [milliseconds] as `MM:SS`, adding `HH:` when the duration reaches one hour.
      */
     fun formatTime(milliseconds: Long): String {
         val totalSeconds = milliseconds / 1000
@@ -26,9 +22,7 @@ object TimeUtils {
         }
     }
 
-    /**
-     * 固定显示小时
-     */
+    /** Formats [milliseconds] as `HH:MM:SS`, including zero hours. */
     fun formatTimeWithHours(milliseconds: Long): String {
         val totalSeconds = milliseconds / 1000
         val hours = totalSeconds / 3600

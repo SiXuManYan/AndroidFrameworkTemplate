@@ -13,22 +13,11 @@ import com.template.framework.database.entity.LinePosition
 import com.template.framework.database.entity.ProductHistory
 
 /**
- * 框架数据库
+ * Sample Room database containing production-line and product-history tables.
  *
- * 业务可在自己的 AppDatabase 中继承此类，或直接基于此扩展：
- * ```kotlin
- * @Database(
- *     entities = [...],
- *     version = 2,
- *     exportSchema = false
- * )
- * abstract class AppDatabase : FrameworkDatabase() {
- *     abstract fun myDao(): MyDao
- * }
- * ```
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * [getDatabase] uses destructive fallback migration, which is convenient for a template but can
+ * delete user data. Production apps should define their own database and explicit migrations.
+ * - 中文：示例数据库升级时可能清表，正式项目应建立独立数据库并编写迁移。
  */
 @Database(
     entities = [ProductHistory::class, Line::class, LinePosition::class],
@@ -37,7 +26,10 @@ import com.template.framework.database.entity.ProductHistory
 )
 abstract class FrameworkDatabase : RoomDatabase() {
 
+    /** Returns the DAO for product-history records. */
     abstract fun productHistoryDao(): ProductHistoryDao
+
+    /** Returns the DAO for lines and their positions. */
     abstract fun lineDao(): LineDao
 
     companion object {
@@ -45,9 +37,10 @@ abstract class FrameworkDatabase : RoomDatabase() {
         private var INSTANCE: FrameworkDatabase? = null
 
         /**
-         * 获取单例实例
+         * Returns the lazily created process-wide sample database.
          *
-         * @param context 上下文
+         * @param context any context; only its application context is retained
+         * @return the shared [FrameworkDatabase] instance
          */
         fun getDatabase(context: Context): FrameworkDatabase {
             return INSTANCE ?: synchronized(this) {

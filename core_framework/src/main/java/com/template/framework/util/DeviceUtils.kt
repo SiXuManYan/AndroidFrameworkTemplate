@@ -7,23 +7,18 @@ import androidx.annotation.RequiresPermission
 import java.net.NetworkInterface
 
 /**
- * 设备工具类
+ * Device network and identifier helpers.
  *
- * 提供：
- * - 获取设备局域网 IPv4 地址
- * - 获取设备序列号（SN）
- * - 英文转大写（保留中文）
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * Hardware identifiers are restricted on modern Android versions. [getDeviceSerialNumber] falls
+ * back to Android ID when the serial number is unavailable.
+ * - 中文：提供局域网 IPv4、设备标识回退和 ASCII 英文大写转换。
  */
 object DeviceUtils {
 
     /**
-     * 获取设备当前所在网络的局域网 IPv4 地址
-     * 优先返回非回环、非 IPv6 的地址。
+     * Returns the first non-loopback IPv4 address found across network interfaces.
      *
-     * @return 局域网 IPv4 字符串，获取失败返回空字符串
+     * @return an IPv4 address, or an empty string when none can be read
      */
     fun getDeviceLocalIpAddress(): String {
         return try {
@@ -45,17 +40,12 @@ object DeviceUtils {
     }
 
     /**
-     * 获取设备序列号（SN 码）
+     * Returns the hardware serial number when permitted, otherwise Android ID.
      *
-     * 优先尝试 Build.SERIAL，失败时回退到 Android ID。
+     * Android 10+ generally restricts hardware serial access to privileged apps. This function
+     * catches permission failures and returns an empty string only when both identifiers fail.
      *
-     * 注意：
-     * - Android 8.0+ 需要 READ_PHONE_STATE 权限才能获取序列号
-     * - Android 10+ 需要系统级权限 READ_PRIVILEGED_PHONE_STATE，普通应用无法获取
-     * - 如果没有权限或获取失败，会自动降级用 Android ID
-     *
-     * @param context 上下文
-     * @return 设备序列号字符串
+     * @param context context used to access secure settings
      */
     @RequiresPermission("android.permission.READ_PRIVILEGED_PHONE_STATE")
     fun getDeviceSerialNumber(context: Context): String {
@@ -82,7 +72,8 @@ object DeviceUtils {
     }
 
     /**
-     * 获取 Android ID
+     * Returns Android ID, or an empty string when secure settings cannot be read.
+     * - 中文：获取 Android ID，读取失败时返回空字符串。
      */
     private fun getAndroidId(context: Context): String {
         return try {
@@ -92,9 +83,7 @@ object DeviceUtils {
         }
     }
 
-    /**
-     * 将字符串中的英文全部转为大写，中文和其他字符保持不变
-     */
+    /** Converts ASCII letters in [text] to uppercase while preserving all other characters. */
     fun toUpperCaseEnglish(text: String): String {
         return text.map { char ->
             if (char.isLetter() && char.code < 128) char.uppercaseChar() else char

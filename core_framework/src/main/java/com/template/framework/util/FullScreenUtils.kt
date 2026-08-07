@@ -9,9 +9,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 /**
- * Dialog 扩展函数：自动应用全屏设置
+ * Shows a dialog and immediately applies immersive full-screen behavior.
  *
- * 用法：
+ * ## Usage
  * ```kotlin
  * dialog.showFullScreen()
  * ```
@@ -22,27 +22,20 @@ fun Dialog.showFullScreen() {
 }
 
 /**
- * 全屏工具类
+ * Configures immersive windows for kiosk-style screens.
  *
- * - 隐藏状态栏和导航栏
- * - 允许通过滑动临时显示系统栏
- * - 使用 AndroidX WindowInsets API 兼容各系统版本
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * System bars are hidden but may be revealed transiently with a swipe. Standard phone screens
+ * should normally use [SystemBarUtils] instead.
+ * - 中文：用于 kiosk 沉浸式全屏；普通页面建议保留系统栏。
  */
 object FullScreenUtils {
 
-    /**
-     * 为 Activity 设置全屏
-     */
+    /** Hides system bars for [activity] while allowing transient swipe reveal. */
     fun enableFullScreen(activity: Activity) {
         configureImmersiveWindow(activity.window)
     }
 
-    /**
-     * 为 Dialog 设置全屏
-     */
+    /** Applies immersive mode to [dialog] and keeps the screen awake while it is shown. */
     fun enableFullScreenForDialog(dialog: Dialog) {
         val window: Window = dialog.window ?: return
         configureImmersiveWindow(window)

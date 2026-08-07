@@ -3,10 +3,20 @@ package com.template.framework.api.model.auth
 import com.google.gson.annotations.SerializedName
 
 /**
- * 登录响应数据
+ * Token and user metadata returned by the sample login endpoint.
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * - 中文：示例登录响应数据，包含访问令牌、刷新令牌及可选用户信息。
+ *
+ * @property accessToken bearer token used for authenticated requests
+ * @property refreshToken optional token used by a business-defined refresh flow
+ * @property expireIn access-token lifetime reported by the backend
+ * @property refreshExpireIn optional refresh-token lifetime
+ * @property clientId optional backend client identifier
+ * @property scope optional authorization scope
+ * @property openid optional OpenID-style identifier
+ * @property nickName optional display name
+ * @property userId optional user identifier
+ * @property msg optional backend message
  */
 data class LoginDataResponse(
     @SerializedName("access_token")

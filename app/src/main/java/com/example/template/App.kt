@@ -5,12 +5,10 @@ import com.template.framework.Framework
 import com.template.framework.api.FrameworkConfig
 
 /**
- * 应用 Application 类
+ * Demo application entry point.
  *
- * 在 onCreate 中初始化 [Framework]，传入运行配置。
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * Initializes [Framework] before any Activity accesses framework services.
+ * - 中文：示例应用入口，负责在页面创建前完成框架初始化。
  */
 class App : Application() {
 

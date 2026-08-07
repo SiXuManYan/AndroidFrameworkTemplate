@@ -23,15 +23,14 @@ import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
 /**
- * WebSocket 管理器（单例）
+ * Process-wide WebSocket connection manager with fixed-interval reconnection after a connection
+ * has opened successfully.
  *
- * 特性：
- * - 异常断线后按固定间隔自动重连
- * - 状态 / 消息以 [StateFlow] 形式暴露，方便 ViewModel 收集
- * - 复用 NetworkModule 的 SSL 配置（HTTPS / WSS 共享）
- * - 同一服务器多次调用 connect 不会重复连接
+ * It exposes connection state and the latest text message as [StateFlow], shares the HTTP TLS
+ * configuration, and ignores duplicate connection requests for the same server.
+ * - 中文：管理单例 WebSocket 连接、状态流、最新消息与异常断线重连。
  *
- * 使用示例：
+ * ## Usage
  * ```kotlin
  * val manager = WebSocketManager.getInstance()
  *
@@ -55,8 +54,6 @@ import java.util.concurrent.TimeUnit
  * manager.disconnect()
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 class WebSocketManager private constructor() {
 
@@ -66,6 +63,7 @@ class WebSocketManager private constructor() {
         @Volatile
         private var INSTANCE: WebSocketManager? = null
 
+        /** Returns the process-wide manager instance. */
         fun getInstance(): WebSocketManager {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: WebSocketManager().also { INSTANCE = it }
@@ -79,34 +77,58 @@ class WebSocketManager private constructor() {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
+
+    /** Observable state of the current connection attempt. */
     val connectionState: StateFlow<ConnectionState> = _connectionState
 
     private val _messageFlow = MutableStateFlow<String?>(null)
+
+    /**
+     * Most recently received message represented as text, or `null` before the first message.
+     *
+     * Binary messages are decoded as UTF-8. This is state, not an event queue: identical
+     * consecutive messages may not emit again.
+     */
     val messageFlow: StateFlow<String?> = _messageFlow
 
-    /** 当前连接的 IP */
+    /** Host retained for duplicate detection and automatic reconnect. */
     private var currentConnectedIp: String? = null
 
-    /** 当前连接的端口 */
+    /** Port retained for duplicate detection and automatic reconnect. */
     private var currentConnectedPort: String? = null
 
-    /** 当前连接的 SN 号 */
+    /** Optional device serial number reused during reconnect. */
     private var currentConnectedSnNumber: String? = null
 
+    /** Represents the observable lifecycle of a WebSocket connection. */
     sealed class ConnectionState {
+        /** No active connection or connection attempt. */
         object Disconnected : ConnectionState()
+
+        /** A handshake is currently in progress. */
         object Connecting : ConnectionState()
+
+        /** The WebSocket handshake completed successfully. */
         object Connected : ConnectionState()
+
+        /**
+         * The latest connection attempt failed.
+         *
+         * @property message human-readable failure detail
+         */
         data class Error(val message: String) : ConnectionState()
     }
 
     /**
-     * 连接 WebSocket
+     * Connects to the configured WebSocket endpoint.
      *
-     * @param ip 服务器 IP
-     * @param port 服务器端口
-     * @param snNumber 设备 SN 号（可选，会作为 Header 传递）
-     * @param forceReconnect 是否强制重连（即使已连接到相同服务器），默认 false
+     * Debug builds use `ws`; release builds use `wss`. Calling this method again with the same host
+     * and port is ignored while connecting or connected unless [forceReconnect] is `true`.
+     *
+     * @param ip host or IP without a scheme
+     * @param port server port
+     * @param snNumber optional device serial number sent in the handshake header
+     * @param forceReconnect closes and recreates an existing connection to the same server
      */
     fun connect(ip: String, port: String, snNumber: String? = null, forceReconnect: Boolean = false) {
         val currentState = _connectionState.value
@@ -174,9 +196,10 @@ class WebSocketManager private constructor() {
     }
 
     /**
-     * 断开连接
+     * Closes the current socket and resets state to [ConnectionState.Disconnected].
      *
-     * @param stopReconnect 是否停止自动重连，默认 true
+     * @param stopReconnect when `true`, forgets the endpoint and terminates automatic reconnect;
+     * internal reconnect flows may pass `false` to retain endpoint state
      */
     fun disconnect(stopReconnect: Boolean = true) {
         if (stopReconnect) {
@@ -195,17 +218,15 @@ class WebSocketManager private constructor() {
     }
 
     /**
-     * 发送消息
+     * Sends a UTF-8 text [message] through the current socket.
      *
-     * @return 是否发送成功（false 表示未连接或连接已关闭）
+     * @return `true` when OkHttp accepted the message for transmission
      */
     fun sendMessage(message: String): Boolean {
         return webSocket?.send(message) ?: false
     }
 
-    /**
-     * 启动自动重连协程
-     */
+    /** Starts the single reconnect monitor for the retained endpoint. */
     private fun startReconnect() {
         reconnectJob?.cancel()
         reconnectJob = scope.launch {
@@ -263,7 +284,10 @@ class WebSocketManager private constructor() {
     }
 
     /**
-     * 释放资源
+     * Permanently releases the socket and reconnect coroutine for this process.
+     *
+     * Because the manager is a singleton, call this only during terminal process-level cleanup;
+     * normal screens should use [disconnect].
      */
     fun release() {
         disconnect()

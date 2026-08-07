@@ -9,17 +9,13 @@ import timber.log.Timber
 import java.io.IOException
 
 /**
- * 自定义 HTTP 日志拦截器
+ * Logs HTTP request/response metadata, bodies, and elapsed time through Timber.
  *
- * 详细打印：
- * - 请求方法、URL、Headers、Body
- * - 响应状态码、Headers、Body
- * - 请求耗时
+ * Response output is capped at 1 MiB and reads from a cloned buffer, so the downstream response
+ * body remains consumable. The current implementation still buffers the complete response before
+ * logging. [com.template.framework.util.TimberUtil] suppresses output in release mode.
  *
- * 使用 Timber 输出，可被 [com.template.framework.util.TimberUtil] 控制 Release 模式下是否输出。
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * - 中文：记录请求与响应详情，响应正文最多打印 1 MiB，且不会消费原始响应流。
  */
 class HttpLoggingInterceptor : Interceptor {
 

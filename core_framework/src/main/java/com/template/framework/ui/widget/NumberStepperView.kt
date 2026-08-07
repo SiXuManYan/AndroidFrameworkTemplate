@@ -20,10 +20,26 @@ import androidx.core.widget.ImageViewCompat
 import com.template.framework.R
 
 /**
- * A business-agnostic integer stepper extracted from WhereRebirth's NumberView2.
+ * Business-agnostic integer stepper with increment and decrement controls.
  *
  * The value is always clamped to [minValue]..[maxValue]. Programmatic updates do
  * not notify [onValueChangeListener] unless [setValue] is called with `notify = true`.
+ * - 中文：整数步进控件，自动限制上下界；普通赋值默认不触发回调。
+ *
+ * ## Usage
+ * ```kotlin
+ * stepper.apply {
+ *     minValue = 1
+ *     maxValue = 99
+ *     onValueChangeListener = OnValueChangeListener { _, _, newValue, _ ->
+ *         updateQuantity(newValue)
+ *     }
+ * }
+ * ```
+ *
+ * @param context view context
+ * @param attrs optional XML attributes
+ * @param defStyleAttr default style attribute
  */
 class NumberStepperView @JvmOverloads constructor(
     context: Context,
@@ -31,9 +47,28 @@ class NumberStepperView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
-    enum class Change { INCREMENT, DECREMENT, PROGRAMMATIC }
+    /** Identifies the operation that produced a notified value change. */
+    enum class Change {
+        /** User pressed the increment control. */
+        INCREMENT,
 
+        /** User pressed the decrement control. */
+        DECREMENT,
+
+        /** Caller changed the value through [setValue]. */
+        PROGRAMMATIC
+    }
+
+    /** Receives notified value changes. */
     fun interface OnValueChangeListener {
+        /**
+         * Called after the visible value changes.
+         *
+         * @param view source stepper
+         * @param oldValue previous bounded value
+         * @param newValue new bounded value
+         * @param change operation that produced the update
+         */
         fun onValueChanged(
             view: NumberStepperView,
             oldValue: Int,
@@ -59,8 +94,10 @@ class NumberStepperView @JvmOverloads constructor(
         R.string.framework_increase
     )
 
+    /** Listener for user changes and programmatic changes that explicitly request notification. */
     var onValueChangeListener: OnValueChangeListener? = null
 
+    /** Inclusive minimum; updating it clamps [value] without notifying the listener. */
     var minValue: Int = 0
         set(value) {
             require(value <= maxValue) { "minValue must be less than or equal to maxValue" }
@@ -68,6 +105,7 @@ class NumberStepperView @JvmOverloads constructor(
             setValueInternal(currentValue, Change.PROGRAMMATIC, notify = false)
         }
 
+    /** Inclusive maximum; updating it clamps [value] without notifying the listener. */
     var maxValue: Int = Int.MAX_VALUE
         set(value) {
             require(value >= minValue) { "maxValue must be greater than or equal to minValue" }
@@ -75,6 +113,7 @@ class NumberStepperView @JvmOverloads constructor(
             setValueInternal(currentValue, Change.PROGRAMMATIC, notify = false)
         }
 
+    /** Positive amount added or removed for each button press. */
     @setparam:IntRange(from = 1)
     var step: Int = 1
         set(value) {
@@ -82,18 +121,21 @@ class NumberStepperView @JvmOverloads constructor(
             field = value
         }
 
+    /** Whether the numeric label becomes invisible while [value] equals [minValue]. */
     var hideValueAtMin: Boolean = false
         set(value) {
             field = value
             updateViews()
         }
 
+    /** Whether the disabled decrement control remains visible at [minValue]. */
     var showDecrementAtMin: Boolean = false
         set(value) {
             field = value
             updateViews()
         }
 
+    /** Current bounded value; direct assignment does not notify [onValueChangeListener]. */
     var value: Int
         get() = currentValue
         set(value) = setValue(value, notify = false)
@@ -146,6 +188,11 @@ class NumberStepperView @JvmOverloads constructor(
         updateViews()
     }
 
+    /**
+     * Sets and clamps [value].
+     *
+     * @param notify whether a changed value should invoke [onValueChangeListener]
+     */
     fun setValue(value: Int, notify: Boolean = false) {
         setValueInternal(value, Change.PROGRAMMATIC, notify)
     }

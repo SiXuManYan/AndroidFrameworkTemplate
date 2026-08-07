@@ -1,11 +1,12 @@
 package com.template.framework.api.model.websocket
 
 /**
- * WebSocket 消息类型示例
+ * Example message types for a WebSocket protocol.
  *
- * 推荐做法：业务侧定义自己的消息类型枚举，实现 [fromValue] 与解析逻辑。
+ * Define business-specific values in the App module and provide a parser similar to [fromValue].
+ * - 中文：这里只保留演示值，真实消息类型应由业务模块定义。
  *
- * 使用示例：
+ * ## Example
  * ```kotlin
  * enum class MyMessageType(val value: String) {
  *     PING("ping"),
@@ -18,24 +19,30 @@ package com.template.framework.api.model.websocket
  * }
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @property value serialized protocol value
  */
 enum class WebSocketMessageType(val value: String) {
 
-    /** 心跳 */
+    /**
+     * Heartbeat request.
+     * - 中文：心跳请求。
+     */
     PING("ping"),
 
-    /** 心跳响应 */
+    /**
+     * Heartbeat response.
+     * - 中文：心跳响应。
+     */
     PONG("pong"),
 
-    /** 通用业务消息 */
+    /**
+     * Placeholder for a business payload.
+     * - 中文：通用业务消息占位。
+     */
     BUSINESS("business");
 
     companion object {
-        /**
-         * 根据字符串值获取枚举
-         */
+        /** Returns the matching message type, or `null` for an unknown protocol value. */
         fun fromValue(value: String): WebSocketMessageType? {
             return values().find { it.value == value }
         }

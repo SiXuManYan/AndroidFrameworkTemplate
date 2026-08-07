@@ -3,11 +3,19 @@ package com.template.framework.util
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-/** Decimal arithmetic with an explicit, consistent rounding policy. */
+/**
+ * Decimal arithmetic with an explicit, consistent rounding policy.
+ *
+ * Operations round only their final result. Prefer constructing monetary values from strings;
+ * use [fromDouble] only when the input already exists as a `Double`.
+ * - 中文：统一处理 `BigDecimal` 精度与舍入，金额建议优先从字符串构造。
+ */
 object DecimalUtils {
 
+    /** Default number of digits kept after the decimal point. */
     const val DEFAULT_SCALE = 2
 
+    /** Default financial-style rounding mode used by all helpers. */
     val DEFAULT_ROUNDING_MODE: RoundingMode = RoundingMode.HALF_UP
 
     /** Creates a decimal without inheriting the binary representation error of [Double]. */
@@ -19,6 +27,7 @@ object DecimalUtils {
         roundingMode: RoundingMode = DEFAULT_ROUNDING_MODE
     ): BigDecimal = round(BigDecimal.valueOf(value), scale, roundingMode)
 
+    /** Returns [value] rounded to [scale] using [roundingMode]. */
     @JvmStatic
     @JvmOverloads
     fun round(
@@ -27,6 +36,7 @@ object DecimalUtils {
         roundingMode: RoundingMode = DEFAULT_ROUNDING_MODE
     ): BigDecimal = value.setScale(scale, roundingMode)
 
+    /** Adds [left] and [right], then rounds the result once. */
     @JvmStatic
     @JvmOverloads
     fun add(
@@ -48,6 +58,7 @@ object DecimalUtils {
         return round(total, scale, roundingMode)
     }
 
+    /** Subtracts [right] from [left], then rounds the result once. */
     @JvmStatic
     @JvmOverloads
     fun subtract(
@@ -57,6 +68,7 @@ object DecimalUtils {
         roundingMode: RoundingMode = DEFAULT_ROUNDING_MODE
     ): BigDecimal = round(left.subtract(right), scale, roundingMode)
 
+    /** Multiplies [left] by [right], then rounds the result once. */
     @JvmStatic
     @JvmOverloads
     fun multiply(
@@ -66,6 +78,11 @@ object DecimalUtils {
         roundingMode: RoundingMode = DEFAULT_ROUNDING_MODE
     ): BigDecimal = round(left.multiply(right), scale, roundingMode)
 
+    /**
+     * Divides [dividend] by [divisor] using the requested scale and rounding mode.
+     *
+     * @throws ArithmeticException when [divisor] is zero
+     */
     @JvmStatic
     @JvmOverloads
     fun divide(

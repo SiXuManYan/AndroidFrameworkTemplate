@@ -1,9 +1,11 @@
 package com.template.framework.api.model.auth
 
 /**
- * 设备登录请求
+ * Request body for the sample device-login endpoint.
  *
- * 示例：
+ * - 中文：示例设备登录请求；字段含义最终以真实服务端协议为准。
+ *
+ * ## Example
  * ```kotlin
  * val request = DeviceLoginRequest(
  *     grantType = "device",
@@ -12,14 +14,12 @@ package com.template.framework.api.model.auth
  * )
  * ```
  *
- * @param clientId 客户端标识（可选，默认 null 时由 TokenInterceptor 添加）
- * @param grantType 授权类型，由 App 业务定义，如 "device"、"face"、"card"
- * @param userId 用户 ID（可空）
- * @param cardNo 卡号（可空）
- * @param snNumber 设备序列号
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * @property clientId optional client identifier in the JSON body; unrelated to the interceptor
+ * header with the same meaning
+ * @property grantType authorization strategy such as `device`, `face`, or `card`
+ * @property userId optional user identifier
+ * @property cardNo optional card number
+ * @property snNumber device serial number
  */
 data class DeviceLoginRequest(
     val clientId: String? = null,

@@ -15,19 +15,16 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
- * DataStore 备份工具类
+ * Mirrors preference values between DataStore and a SharedPreferences backup.
  *
- * 实现 DataStore + SharedPreferences 双写双读模式：
- * - 保存：同时写入 DataStore 和 SharedPreferences
- * - 读取：优先从 DataStore 读取，如果为空则从 SharedPreferences 恢复
- * - 删除：同时从 DataStore 和 SharedPreferences 删除
+ * Writes and removals target both stores. Reads prefer DataStore and restore a missing value from
+ * SharedPreferences in the background. Blank strings are treated as missing values.
  *
- * 适用场景：
- * - 防止 DataStore 异常（如升级失败、数据损坏）导致配置丢失
- * - 兼顾新用户（DataStore）与老用户（SharedPreferences）的迁移
+ * - 中文：写入时双写，读取时优先 DataStore；缺失值会从 SharedPreferences 恢复。
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @param context context used to open the backup SharedPreferences file
+ * @param dataStore primary preferences store
+ * @param backupPrefsName backup SharedPreferences file name
  */
 class DataStoreBackupHelper(
     private val context: Context,
@@ -40,8 +37,14 @@ class DataStoreBackupHelper(
 
     private fun isBlankValue(value: String?): Boolean = value.isNullOrBlank()
 
-    // region [保存 - String]
-
+    /**
+     * Stores a string in both stores.
+     *
+     * @param key typed DataStore key; its name is reused for SharedPreferences
+     * @param value value to persist
+     * @param useCommit when `true`, blocks until the backup write reaches disk; otherwise uses
+     * asynchronous `apply()`
+     */
     suspend fun putString(key: Preferences.Key<String>, value: String, useCommit: Boolean = true) {
         try {
             dataStore.edit { it[key] = value }
@@ -54,10 +57,7 @@ class DataStoreBackupHelper(
         }
     }
 
-    // endregion
-
-    // region [保存 - Int]
-
+    /** Stores an integer in both stores; see [putString] for [useCommit] semantics. */
     suspend fun putInt(key: Preferences.Key<Int>, value: Int, useCommit: Boolean = true) {
         try {
             dataStore.edit { it[key] = value }
@@ -70,10 +70,7 @@ class DataStoreBackupHelper(
         }
     }
 
-    // endregion
-
-    // region [保存 - Boolean]
-
+    /** Stores a Boolean in both stores; see [putString] for [useCommit] semantics. */
     suspend fun putBoolean(key: Preferences.Key<Boolean>, value: Boolean, useCommit: Boolean = true) {
         try {
             dataStore.edit { it[key] = value }
@@ -86,10 +83,14 @@ class DataStoreBackupHelper(
         }
     }
 
-    // endregion
-
-    // region [读取 - String（异步）]
-
+    /**
+     * Reads a string from DataStore, falling back to the backup.
+     *
+     * A non-blank backup value is returned immediately and restored to DataStore asynchronously.
+     *
+     * @param key typed preference key
+     * @param defaultValue value returned when neither store contains a non-blank value
+     */
     suspend fun getString(key: Preferences.Key<String>, defaultValue: String? = null): String? {
         return try {
             val dsValue = dataStore.data.first()[key]
@@ -107,10 +108,7 @@ class DataStoreBackupHelper(
         }
     }
 
-    // endregion
-
-    // region [读取 - Int（异步）]
-
+    /** Reads an integer from DataStore, then the backup, then [defaultValue]. */
     suspend fun getInt(key: Preferences.Key<Int>, defaultValue: Int? = null): Int? {
         return try {
             val dsValue = dataStore.data.first()[key]
@@ -131,10 +129,7 @@ class DataStoreBackupHelper(
         }
     }
 
-    // endregion
-
-    // region [读取 - Boolean（异步）]
-
+    /** Reads a Boolean from DataStore, then the backup, then [defaultValue]. */
     suspend fun getBoolean(key: Preferences.Key<Boolean>, defaultValue: Boolean? = null): Boolean? {
         return try {
             val dsValue = dataStore.data.first()[key]
@@ -155,10 +150,7 @@ class DataStoreBackupHelper(
         }
     }
 
-    // endregion
-
-    // region [删除]
-
+    /** Removes [key] from both stores. */
     suspend fun remove(key: Preferences.Key<*>) {
         try {
             dataStore.edit { it.remove(key) }
@@ -170,10 +162,11 @@ class DataStoreBackupHelper(
         }
     }
 
-    // endregion
-
-    // region [Flow - String]
-
+    /**
+     * Observes a string preference with backup fallback and duplicate suppression.
+     *
+     * Backup recovery is scheduled when DataStore emits a missing or blank value.
+     */
     fun getStringFlow(key: Preferences.Key<String>, defaultValue: String? = null): Flow<String?> {
         return dataStore.data.map { prefs ->
             val v = prefs[key]
@@ -190,10 +183,7 @@ class DataStoreBackupHelper(
         }.distinctUntilChanged()
     }
 
-    // endregion
-
-    // region [Flow - Int]
-
+    /** Observes an integer preference with backup fallback and duplicate suppression. */
     fun getIntFlow(key: Preferences.Key<Int>, defaultValue: Int? = null): Flow<Int?> {
         return dataStore.data.map { prefs ->
             val v = prefs[key]
@@ -212,10 +202,7 @@ class DataStoreBackupHelper(
         }.distinctUntilChanged()
     }
 
-    // endregion
-
-    // region [Flow - Boolean]
-
+    /** Observes a Boolean preference with backup fallback and duplicate suppression. */
     fun getBooleanFlow(key: Preferences.Key<Boolean>, defaultValue: Boolean? = null): Flow<Boolean?> {
         return dataStore.data.map { prefs ->
             val v = prefs[key]
@@ -233,8 +220,6 @@ class DataStoreBackupHelper(
             }
         }.distinctUntilChanged()
     }
-
-    // endregion
 
     private companion object {
         const val TAG = "DataStoreBackup"

@@ -12,19 +12,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * 唯一示例 Activity
+ * Runnable screen demonstrating the framework's main integration path.
  *
- * 演示 [Framework] 提供的核心能力：
- * - DataStore 读写（IP / 端口）
- * - Repository 调用 ApiService 发起请求
- * - Token 自动注入（TokenInterceptor）
- * - 401 自动处理（AuthErrorInterceptor）
- * - WebSocket 连接与断开
+ * The screen persists a server address, calls the sample login API, stores its token, and controls
+ * the shared WebSocket connection. The HTTP and WebSocket actions require a compatible backend.
  *
- * 运行前请在下方输入 IP 与端口，点击「保存设置」后点击「调用 Login」。
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * - 中文：演示服务器配置、登录请求、Token 保存以及 WebSocket 连接/断开。
  */
 class MainActivity : BaseActivity<ActivityMainBinding>() {
 

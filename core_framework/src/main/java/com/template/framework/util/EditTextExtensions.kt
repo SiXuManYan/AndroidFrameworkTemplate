@@ -10,21 +10,17 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 
 /**
- * EditText 通用扩展函数
+ * Controls whether focusing this `EditText` opens the software keyboard.
  *
- * 业务级扩展（刷卡、扫码枪监听）请在 App 模块中实现，框架层只提供通用能力。
+ * Useful for barcode scanners and other hardware-input workflows.
+ * - 中文：适用于扫码枪等硬件输入场景，可禁止焦点触发软键盘。
  *
- * @author Shiwei Wang
- * @date 2026-02
- */
-
-/**
- * 设置 EditText 在获取焦点时是否显示软键盘
- *
- * 用法：
+ * ## Usage
  * ```kotlin
- * editText.setShowSoftInputOnFocus(false)  // 禁止弹出软键盘（用于硬件输入设备）
+ * editText.setShowSoftInputOnFocus(false)
  * ```
+ *
+ * @param show whether focus should request the software keyboard
  */
 fun EditText.setShowSoftInputOnFocus(show: Boolean) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -43,10 +39,7 @@ fun EditText.setShowSoftInputOnFocus(show: Boolean) {
     }
 }
 
-/**
- * 安全地请求 EditText 焦点
- * 使用 post 确保视图渲染完成后请求焦点
- */
+/** Posts a focus request so it runs after the current view traversal. */
 fun EditText.requestFocusSafely() {
     this.post {
         if (!this.isFocused) this.requestFocus()
@@ -54,7 +47,7 @@ fun EditText.requestFocusSafely() {
 }
 
 /**
- * 延迟请求 EditText 焦点
+ * Requests focus after [delayMillis]. Non-positive delays fall back to [requestFocusSafely].
  */
 fun EditText.requestFocusSafely(delayMillis: Long) {
     if (delayMillis <= 0) {
@@ -69,20 +62,23 @@ fun EditText.requestFocusSafely(delayMillis: Long) {
 }
 
 /**
- * 保持 EditText 焦点持续
+ * Reclaims focus after it is lost, until [lifecycleOwner] is destroyed.
  *
- * 输入完成后自动重新获取焦点，适合连续扫码/刷卡场景。
+ * The lifecycle observer removes callbacks and the focus listener to avoid retaining a destroyed
+ * screen. This is intended for continuous scanner/card-reader input.
+ * - 中文：焦点丢失后自动恢复，并在生命周期结束时清理回调。
  *
- * @param lifecycleOwner 生命周期拥有者
- * @param delayAfterInput 输入完成后延迟重新获取焦点的时间（毫秒），默认 300ms
+ * @param lifecycleOwner owner that controls cleanup
+ * @param delayAfterInput delay in milliseconds before reclaiming focus
  */
 fun EditText.keepFocus(lifecycleOwner: LifecycleOwner, delayAfterInput: Long = 300L) {
     val handler = Handler(Looper.getMainLooper())
+    val focusDelay = delayAfterInput.coerceAtLeast(0L)
     val focusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
         if (!hasFocus) {
             handler.postDelayed({
                 if (!this.isFocused) this.requestFocus()
-            }, 200L)
+            }, focusDelay)
         }
     }
     this.onFocusChangeListener = focusChangeListener
@@ -94,9 +90,7 @@ fun EditText.keepFocus(lifecycleOwner: LifecycleOwner, delayAfterInput: Long = 3
     })
 }
 
-/**
- * 设置文本并将光标移动到末尾
- */
+/** Replaces the text and moves the cursor to the end; `null` becomes an empty string. */
 fun EditText.setTextAndMoveCursorToEnd(text: String?) {
     val safeText = text ?: ""
     setText(safeText)

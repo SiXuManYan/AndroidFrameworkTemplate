@@ -3,13 +3,15 @@ package com.template.framework.api.model.production
 import com.google.gson.annotations.SerializedName
 
 /**
- * 复杂 POST 请求示例
+ * Request body used by the sample product-save endpoint.
  *
- * 演示 `@POST` + `@Body` 的复杂对象请求。
- * 实际业务中可重命名为符合业务的实体。
+ * - 中文：用于演示 `@POST` + `@Body` 的复合请求模型。
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @property snNumber device serial number
+ * @property lineId optional production line identifier
+ * @property postId optional workstation identifier
+ * @property productCode optional product code
+ * @property type sample operation type defined by the backend
  */
 data class SaveProductsRequest(
     @SerializedName("snNumber")

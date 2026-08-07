@@ -20,34 +20,30 @@ import com.template.framework.R
 import com.template.framework.util.FullScreenUtils
 
 /**
- * DialogFragment 基类
+ * Full-window DialogFragment foundation with ViewBinding and IME-aware content positioning.
  *
- * 提供能力：
- * - ViewBinding 生命周期管理
- * - 全窗口展示，默认保留系统栏
- * - 点击外部空白区域时，先隐藏软键盘，再关闭（可通过 [enableOutsideDismiss] 关闭）
- * - 软键盘弹出时，自动上移 CardView，保证 EditText 可见
+ * ## Layout contract
+ * - `R.id.rootLayout` receives outside clicks.
+ * - `R.id.cardView` consumes content clicks and moves upward when the IME covers an `EditText`.
  *
- * 布局要求：
- * - 根布局需要包含 id `R.id.rootLayout`（点击空白区域处理）
- * - 卡片容器需要 id `R.id.cardView`（阻止事件冒泡 + 跟随软键盘上移）
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * The binding remains valid only for the Fragment view lifecycle. System bars stay visible unless
+ * [enableImmersiveFullScreen] is overridden.
+ * - 中文：提供 ViewBinding、外部点击处理及软键盘遮挡时的卡片上移能力。
  */
 abstract class BaseDialogFragment<VB : ViewBinding> : DialogFragment() {
 
     private var _binding: VB? = null
 
+    /** Binding valid only between `onCreateView` and `onDestroyView`. */
     protected val binding: VB
         get() = _binding ?: throw IllegalStateException(
             "Binding is only valid between onCreateView and onDestroyView"
         )
 
-    /** 是否允许点击对话框外部时关闭 */
+    /** Whether an outside click may dismiss a cancelable dialog after hiding the keyboard. */
     protected open val enableOutsideDismiss: Boolean = true
 
-    /** kiosk 场景可覆盖为 true；通用手机界面默认保留系统栏。 */
+    /** Whether the dialog hides system bars when started. */
     protected open val enableImmersiveFullScreen: Boolean = false
 
     private var currentCardViewTranslationY = 0f
@@ -79,6 +75,7 @@ abstract class BaseDialogFragment<VB : ViewBinding> : DialogFragment() {
         observeViewModel()
     }
 
+    /** Loads initial data after [initView] and before listener registration. */
     abstract fun initData()
 
     override fun onStart() {
@@ -97,9 +94,7 @@ abstract class BaseDialogFragment<VB : ViewBinding> : DialogFragment() {
         root.findViewById<View>(R.id.cardView)?.setOnClickListener { /* 阻止冒泡 */ }
     }
 
-    /**
-     * 监听软键盘弹出，自动调整 CardView 位置
-     */
+    /** Moves the card enough to keep a nested `EditText` above the IME. */
     private fun setupKeyboardAdjustment(root: View) {
         val cardView = root.findViewById<View>(R.id.cardView) ?: return
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
@@ -165,6 +160,7 @@ abstract class BaseDialogFragment<VB : ViewBinding> : DialogFragment() {
         return imm.isActive && dialog?.window?.currentFocus is EditText
     }
 
+    /** Hides the keyboard and clears the currently focused dialog view. */
     protected fun hideKeyboard() {
         val imm = ContextCompat.getSystemService(requireContext(), InputMethodManager::class.java)
             ?: return
@@ -181,9 +177,15 @@ abstract class BaseDialogFragment<VB : ViewBinding> : DialogFragment() {
         currentCardViewTranslationY = 0f
     }
 
+    /** Inflates or creates the binding for this dialog view. */
     protected abstract fun initViewBinding(inflater: LayoutInflater, container: ViewGroup?): VB
 
+    /** Configures initial view state. */
     protected open fun initView() {}
+
+    /** Registers UI listeners after [initData]. */
     protected open fun initListener() {}
+
+    /** Starts lifecycle-aware state observation after listeners are registered. */
     protected open fun observeViewModel() {}
 }

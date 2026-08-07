@@ -12,6 +12,11 @@ import kotlin.math.max
  *
  * Children keep adapter/XML order. In RTL, the first child starts at the right edge. Children
  * beyond [maxRows] are measured but laid out at zero size so stale bounds cannot remain visible.
+ * - 中文：子 View 按顺序自动换行，支持 RTL 和最大显示行数。
+ *
+ * @param context view context
+ * @param attrs optional XML attributes
+ * @param defStyleAttr default style attribute
  */
 class FlowLayout @JvmOverloads constructor(
     context: Context,
@@ -19,6 +24,7 @@ class FlowLayout @JvmOverloads constructor(
     defStyleAttr: Int = 0,
 ) : ViewGroup(context, attrs, defStyleAttr) {
 
+    /** Horizontal gap between adjacent children, in pixels; negative values normalize to zero. */
     var horizontalSpacing: Int = 0
         set(value) {
             val normalized = value.coerceAtLeast(0)
@@ -28,6 +34,7 @@ class FlowLayout @JvmOverloads constructor(
             }
         }
 
+    /** Vertical gap between rows, in pixels; negative values normalize to zero. */
     var verticalSpacing: Int = 0
         set(value) {
             val normalized = value.coerceAtLeast(0)
@@ -37,7 +44,7 @@ class FlowLayout @JvmOverloads constructor(
             }
         }
 
-    /** Zero is supported and hides all rows. */
+    /** Maximum visible row count; zero hides all rows and negative values normalize to zero. */
     var maxRows: Int = Int.MAX_VALUE
         set(value) {
             val normalized = value.coerceAtLeast(0)

@@ -11,7 +11,17 @@ import android.widget.TextView
 import com.template.framework.R
 import com.template.framework.ui.base.BaseDialog
 
-/** A small, non-cancelable-by-default loading dialog with an optional message. */
+/**
+ * Small loading dialog with an optional message.
+ *
+ * It is non-cancelable by default and never dismisses from an outside click. Updating [message]
+ * while visible refreshes the label immediately.
+ * - 中文：通用加载弹窗，默认不可取消，可在显示期间动态修改提示文字。
+ *
+ * @param context host context
+ * @param message optional initial label; blank text hides the label
+ * @param cancelable whether the system back action may cancel the dialog
+ */
 class LoadingDialog @JvmOverloads constructor(
     context: Context,
     message: CharSequence? = null,
@@ -20,6 +30,7 @@ class LoadingDialog @JvmOverloads constructor(
 
     override val enableOutsideDismiss: Boolean = false
 
+    /** Current loading label; `null` or blank hides the message view. */
     var message: CharSequence? = message
         set(value) {
             field = value

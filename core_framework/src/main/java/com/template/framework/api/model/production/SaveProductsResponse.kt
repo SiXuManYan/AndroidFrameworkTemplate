@@ -3,10 +3,10 @@ package com.template.framework.api.model.production
 import com.google.gson.annotations.SerializedName
 
 /**
- * 简单 POST 响应示例
+ * Product summary returned by the sample save endpoint.
  *
- * @author Shiwei Wang
- * @date 2026-02
+ * @property productCode saved product code
+ * @property productName saved product display name
  */
 data class SaveProductsResponse(
     @SerializedName("productCode")

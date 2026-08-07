@@ -12,14 +12,13 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 /**
- * 框架默认 API 服务
+ * Example Retrofit contract bundled with the framework.
  *
- * 仅保留示例接口，覆盖 Retrofit 常用注解：
- * - `@POST` + `@Body`：登录、复杂请求
- * - `@GET` + `@Query`：带参数的 GET
- * - `ApiResponse<T>` / `ApiResponse<List<T>>` / `ApiResponse<Unit>`
+ * These endpoints demonstrate common request and response shapes. Real service contracts should
+ * live in the App or feature module instead of being added to this generic interface.
+ * - 中文：这里的接口用于演示 Retrofit 写法，真实业务接口建议放在业务模块。
  *
- * 业务可自行扩展：
+ * ## Custom API example
  * ```kotlin
  * interface MyApi {
  *     @GET("user/info")
@@ -32,42 +31,35 @@ import retrofit2.http.Query
  * val myApi = NetworkModule.createApiService<MyApi>(baseUrl)
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 interface ApiService {
 
     /**
-     * 登录示例
+     * Sends the example device-login request.
      *
-     * - `@POST` + `@Body`：复杂对象请求
-     * - `ApiResponse<LoginDataResponse>`：业务响应
+     * @param request login payload defined by the sample backend contract
+     * @return the backend envelope containing login tokens and user metadata
      */
     @POST("auth/login/device")
     suspend fun deviceLogin(@Body request: DeviceLoginRequest): ApiResponse<LoginDataResponse>
 
-    /**
-     * 列表数据示例（GET 列表）
-     *
-     * - `@GET` + 无参
-     * - `ApiResponse<List<LineAndPostResponse>>`：列表响应
-     */
+    /** Returns the example production lines and their positions. */
     @GET("production/lines/getLineAndPost")
     suspend fun getLineAndPost(): ApiResponse<List<LineAndPostResponse>>
 
     /**
-     * 保存数据示例（POST 复杂对象）
+     * Saves the example production payload.
      *
-     * - `@POST` + `@Body`
-     * - `ApiResponse<SaveProductsResponse>`：返回业务数据
+     * @param request product and workstation data expected by the sample backend
+     * @return the saved product summary wrapped in [ApiResponse]
      */
     @POST("production/product/saveProducts")
     suspend fun saveProducts(@Body request: SaveProductsRequest): ApiResponse<SaveProductsResponse>
 
     /**
-     * 无返回数据示例（POST + ApiResponse<Unit>）
+     * Demonstrates an operation whose response has no useful data payload.
      *
-     * - 仅关心成功/失败，不关心返回内容
+     * @param id identifier consumed by the sample action
      */
     @POST("demo/action")
     suspend fun doAction(@Query("id") id: String): ApiResponse<Unit>

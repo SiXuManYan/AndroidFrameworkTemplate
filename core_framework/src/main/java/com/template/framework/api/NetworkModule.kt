@@ -14,36 +14,36 @@ import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
 /**
- * 网络模块
+ * Factory for framework-configured [OkHttpClient], [Retrofit], and API services.
  *
- * 提供 OkHttpClient / Retrofit / ApiService 的工厂方法。
+ * ## TLS policy
+ * - With no custom certificate, OkHttp uses the platform trust store and hostname verifier.
+ * - [FrameworkConfig.sslCertRawResId] replaces the trust store with the supplied certificate.
  *
- * ## SSL 证书策略
- * - 默认使用系统信任链和主机名校验
- * - 配置 [FrameworkConfig.sslCertRawResId] 时使用指定的 CA 或服务器证书
+ * ## Authentication
+ * The client injects version and token headers and forwards `401` responses to
+ * [com.template.framework.Framework.setOnTokenExpired].
  *
- * ## Token 失效回调
- * 通过 [setOnTokenExpired] 或 [com.template.framework.Framework.setOnTokenExpired] 设置。
- *
- * ## 自定义 ApiService
- * 默认提供 [ApiService]；如需更多接口，可在 App 模块自定义并通过 [createApiService] 创建。
- *
- * @author Shiwei Wang
- * @date 2026-02
+ * - 中文：集中创建网络客户端，并统一处理 Header、日志、401 与证书配置。
  */
 object NetworkModule {
 
     private var retrofit: Retrofit? = null
 
     /**
-     * Token 失效全局回调（AuthErrorInterceptor 触发时调用）
+     * Callback invoked by [AuthErrorInterceptor] after an expired token is cleared.
+     *
+     * This callback may run on an OkHttp worker thread.
      */
     var onTokenExpired: (() -> Unit)? = null
 
     /**
-     * 配置 SSL 证书处理
+     * Applies the optional certificate from [FrameworkConfig.sslCertRawResId] to [builder].
      *
-     * @param builder OkHttpClient.Builder
+     * If no certificate is configured, the builder remains on OkHttp's platform defaults.
+     *
+     * @param builder client builder to configure
+     * @throws IllegalStateException when the configured certificate cannot be parsed or installed
      */
     fun configureSslSocketFactory(builder: OkHttpClient.Builder) {
         val config = Framework.getConfig()
@@ -77,10 +77,11 @@ object NetworkModule {
     }
 
     /**
-     * 创建 OkHttpClient
+     * Creates an OkHttp client with framework timeouts and interceptors.
      *
-     * @param getToken 获取 token 的函数，传 null 则不添加 Authorization
-     * @param clearToken Token 失效时的清除函数，传 null 则不清理
+     * @param getToken suspending provider used to read the latest access token for each request
+     * @param clearToken suspending action run when [AuthErrorInterceptor] detects an expired token
+     * @return a new client; this method does not cache the instance
      */
     fun createOkHttpClient(
         getToken: suspend () -> String? = { null },
@@ -103,9 +104,14 @@ object NetworkModule {
     }
 
     /**
-     * 创建 Retrofit 实例
+     * Creates a Retrofit instance backed by [createOkHttpClient].
      *
-     * @param baseUrl 服务器基础 URL（格式：http://ip:port 或 https://ip:port），必须以 `/` 结尾
+     * A missing trailing slash is added automatically.
+     *
+     * @param baseUrl absolute HTTP(S) base URL
+     * @param getToken provider for the latest access token
+     * @param clearToken action used to clear an expired access token
+     * @return a new Retrofit instance using Gson conversion
      */
     fun createRetrofit(
         baseUrl: String,
@@ -122,7 +128,11 @@ object NetworkModule {
     }
 
     /**
-     * 创建默认的 ApiService
+     * Creates the framework's example [ApiService].
+     *
+     * @param baseUrl absolute HTTP(S) base URL
+     * @param getToken provider for the latest access token
+     * @param clearToken action used to clear an expired access token
      */
     fun createApiService(
         baseUrl: String,
@@ -133,9 +143,9 @@ object NetworkModule {
     }
 
     /**
-     * 创建自定义 ApiService
+     * Creates a caller-defined Retrofit service interface.
      *
-     * 使用示例：
+     * ## Example
      * ```kotlin
      * interface MyApi {
      *     @GET("custom")
@@ -144,6 +154,11 @@ object NetworkModule {
      *
      * val myApi = NetworkModule.createApiService<MyApi>(baseUrl)
      * ```
+     *
+     * @param T Retrofit service interface type
+     * @param baseUrl absolute HTTP(S) base URL
+     * @param getToken provider for the latest access token
+     * @param clearToken action used to clear an expired access token
      */
     inline fun <reified T> createApiService(
         baseUrl: String,
@@ -153,15 +168,11 @@ object NetworkModule {
         return createRetrofit(baseUrl, getToken, clearToken).create(T::class.java)
     }
 
-    /**
-     * 缓存新的 Retrofit 实例
-     */
+    /** Stores [retrofit] in the optional module-level cache. */
     fun cacheRetrofit(retrofit: Retrofit) {
         this.retrofit = retrofit
     }
 
-    /**
-     * 获取缓存的 Retrofit 实例（可能为 null）
-     */
+    /** Returns the instance last supplied to [cacheRetrofit], or `null` when none was cached. */
     fun getCachedRetrofit(): Retrofit? = retrofit
 }

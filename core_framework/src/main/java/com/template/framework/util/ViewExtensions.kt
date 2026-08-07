@@ -3,27 +3,23 @@ package com.template.framework.util
 import android.view.View
 
 /**
- * View 扩展函数工具类
+ * Runs [onTrigger] after [clickCount] clicks occur within [timeWindow].
  *
- * @author Shiwei Wang
- * @date 2026-02
- */
-
-/**
- * 为 View 设置连续点击监听器
+ * A gap longer than the window resets the counter. After triggering, the next sequence starts from
+ * zero.
+ * - 中文：用于隐藏入口等连续点击场景，超时或触发后会重置计数。
  *
- * 在指定时间窗口内连续点击指定次数后触发回调，常用于「隐藏的管理员入口」。
- *
- * @param clickCount 需要连续点击的次数，默认 3
- * @param timeWindow 时间窗口（毫秒），默认 2000ms
- * @param onTrigger 达到点击次数后的回调
- *
- * 用法：
+ * ## Usage
  * ```kotlin
  * titleView.setOnMultiClickListener(clickCount = 5) {
  *     // 进入管理员设置
  * }
  * ```
+ *
+ * @param clickCount required click count; callers should pass a positive value
+ * @param timeWindow maximum interval window in milliseconds; callers should pass a non-negative
+ * value
+ * @param onTrigger callback invoked after the required sequence
  */
 fun View.setOnMultiClickListener(
     clickCount: Int = 3,
