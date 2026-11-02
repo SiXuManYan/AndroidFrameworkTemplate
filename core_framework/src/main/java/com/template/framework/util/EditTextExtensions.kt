@@ -11,6 +11,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 
+/** 控制获取焦点是否打开软键盘，适合外部键盘或扫码枪输入。 */
 fun EditText.setShowSoftInputOnFocus(show: Boolean) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
         showSoftInputOnFocus = show
@@ -28,10 +29,12 @@ fun EditText.setShowSoftInputOnFocus(show: Boolean) {
     }
 }
 
+/** 等待本次视图遍历后请求焦点。 */
 fun EditText.requestFocusSafely() {
     post { if (!isFocused) requestFocus() }
 }
 
+/** 延迟请求焦点；非正数延迟改为下一次视图遍历。 */
 fun EditText.requestFocusSafely(delayMillis: Long) {
     if (delayMillis <= 0) {
         requestFocusSafely()
@@ -40,11 +43,14 @@ fun EditText.requestFocusSafely(delayMillis: Long) {
     postDelayed({ if (!isFocused) requestFocus() }, delayMillis)
 }
 
+/** 焦点丢失后恢复；页面销毁时清理监听与回调，防止继续持有页面。 */
 fun EditText.keepFocus(lifecycleOwner: LifecycleOwner, delayAfterInput: Long = 300L) {
     val handler = Handler(Looper.getMainLooper())
+    // 统一非负延迟约束，避免负数被当作立即执行。
+    val focusDelay = delayAfterInput.coerceAtLeast(0L)
     val focusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
         if (!hasFocus) {
-            handler.postDelayed({ if (!isFocused) requestFocus() }, delayAfterInput)
+            handler.postDelayed({ if (!isFocused) requestFocus() }, focusDelay)
         }
     }
     onFocusChangeListener = focusChangeListener
@@ -56,14 +62,17 @@ fun EditText.keepFocus(lifecycleOwner: LifecycleOwner, delayAfterInput: Long = 3
     })
 }
 
+/** 更新文本并将光标移到末尾；null 视为空文本。 */
 fun EditText.setTextAndMoveCursorToEnd(text: String?) {
     val safeText = text.orEmpty()
     setText(safeText)
     setSelection(safeText.length)
 }
 
+/** 监听文本变更并移除前后空白。 */
 fun EditText.doAfterTrimmedTextChanged(action: (String) -> Unit): TextWatcher =
     doAfterTextChanged { action(it?.toString()?.trim().orEmpty()) }
 
+/** 判断所有输入框均包含非空白内容。 */
 fun areAllNotBlank(vararg editTexts: EditText): Boolean =
     editTexts.all { it.text?.toString()?.isNotBlank() == true }

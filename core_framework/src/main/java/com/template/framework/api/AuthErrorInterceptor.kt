@@ -19,6 +19,8 @@ import timber.log.Timber
  * 1. 调用 [clearToken] 清除本地 token
  * 2. 调用 [onTokenExpired] 通知 App 层跳转登录页
  *
+ * 两个回调均在 OkHttp 请求线程执行，UI 操作必须切换到主线程。
+ *
  */
 class AuthErrorInterceptor(
     private val onTokenExpired: () -> Unit,

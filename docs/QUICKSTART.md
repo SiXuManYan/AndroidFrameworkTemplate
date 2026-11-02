@@ -17,7 +17,7 @@ android { buildFeatures { viewBinding = true } }
 
 库构建文件使用 `libs` 版本目录：将其用到的别名合并到使用者的 `gradle/libs.versions.toml`，或改为使用者已有依赖坐标和插件版本。不要覆盖整个工程的版本目录；统一 AGP/Kotlin 与 SDK 要求，最低支持 API 29。
 
-公开 API 的 AppCompat、Lifecycle、RecyclerView、Retrofit、OkHttp、Gson、DataStore 和协程类型通过 `api` 暴露。使用者自己添加 Room 时才需要 Room / KSP；库不需要依赖示例 App。当前未发布 Maven 坐标；手动复制 AAR 不会携带依赖元数据，优先使用源码模块接入。
+公开 API 的 AppCompat、Material、Lifecycle、RecyclerView、Retrofit、OkHttp、Gson、DataStore 和协程类型通过 `api` 暴露。使用者自己添加 Room 时才需要 Room / KSP；库不需要依赖示例 App。当前未发布 Maven 坐标；手动复制 AAR 不会携带依赖元数据，优先使用源码模块接入。
 
 ## 1. 基础初始化
 
@@ -136,6 +136,7 @@ configureClient = {
 - Activity / Fragment 继承对应的 ViewBinding 基类，重写 `initViewBinding`、`initView`、`initListener`、`initData`；Fragment Binding 只在视图生命周期内可用。
 - 系统栏默认 edge-to-edge，确有 kiosk 需求时显式调用 `FullScreenUtils.enableFullScreen(this)`。
 - 列表接入见 [RecyclerView](RECYCLERVIEW.md)。
+- 流式布局、评分、步进器、分页吸附、分割线、加载弹窗及空响应转换器见 [可复用组件](REUSABLE_COMPONENTS.md)。加载弹窗需要宿主使用 MaterialComponents 或兼容的 Material 主题。
 
 ## 6. Android Studio 检查
 

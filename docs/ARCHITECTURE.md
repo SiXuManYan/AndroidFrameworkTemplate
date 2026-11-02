@@ -19,7 +19,9 @@ core_framework/
   datastore/                 按需 Preferences 与备份工具
   repository/                兼容偏好入口，不承载业务 API 或 WebSocket
   ui/base/                   UI 基类与兼容适配器
-  ui/recyclerview/           可变数据基类、异步列表与拖拽桥接
+  ui/recyclerview/           可变数据基类、异步列表、拖拽、分页吸附与分割线
+  ui/widget/                 流式布局、星级评分与数量步进器
+  ui/dialog/                 通用加载弹窗
   util/                      系统栏、语言、屏幕、时间与扩展
   constants/                 通用网络和偏好常量
 ```
@@ -35,7 +37,7 @@ core_framework/
 
 按需初始化是**运行时解耦**，不是独立的 Gradle 可选模块：当前仍保留一个 `core_framework` Library，纯本地 App 若希望缩减依赖体积，可另行按功能拆模块。
 
-库不再依赖 Room，也移除了没有源码调用的 Navigation、Material、ConstraintLayout、SwipeRefreshLayout 与 OkHttp logging-interceptor；使用者按自己的页面需求声明这些依赖。
+库不再依赖 Room，也移除了没有源码调用的 Navigation、ConstraintLayout、SwipeRefreshLayout 与 OkHttp logging-interceptor；使用者按自己的页面需求声明这些依赖。加载弹窗的 XML 使用 Material 控件，因此 Library 保留并暴露 Material 依赖。
 
 ## 推荐业务用法
 

@@ -9,11 +9,14 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.Locale
 
+/** 时间与日期工具；时长按非负值格式化，日期转换显式支持时区与 Locale。 */
 object TimeUtils {
     const val DEFAULT_DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm:ss"
 
+    /** 输出 MM:SS，超过一小时后输出 HH:MM:SS。 */
     fun formatTime(milliseconds: Long): String = formatDuration(milliseconds, alwaysShowHours = false)
 
+    /** 始终包含小时，输出 HH:MM:SS。 */
     fun formatTimeWithHours(milliseconds: Long): String =
         formatDuration(milliseconds, alwaysShowHours = true)
 

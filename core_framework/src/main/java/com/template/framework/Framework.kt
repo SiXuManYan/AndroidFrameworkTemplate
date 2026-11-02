@@ -98,7 +98,8 @@ object Framework {
     }
 
     /**
-     * Token 失效回调，由 App 层注入（通常用于跳转到登录页）
+     * Token 失效回调，由 App 层注入（通常用于跳转到登录页）。
+     * 回调位于 OkHttp 工作线程，UI 操作需切换到主线程。
      */
     fun setOnTokenExpired(callback: () -> Unit) {
         NetworkModule.onTokenExpired = callback

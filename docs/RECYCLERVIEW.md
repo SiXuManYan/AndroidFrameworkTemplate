@@ -6,6 +6,7 @@
 - 小列表、需要同步移动数据的拖拽列表：使用这两个可变适配器，可选传入 DiffUtil callback。
 - 经常提交新列表、数据量较大：使用 `ui.recyclerview.BindingListAdapter`，由 ListAdapter 异步差分。
 - 加载头尾或多段列表：可搭配 AndroidX ConcatAdapter；这里的点击/拖拽位置均为子适配器位置，不包含头部偏移。
+- 固定行列分页使用 `GridPagerSnapHelper`，线性列表分割线使用 `DividerItemDecoration`，具体示例见 [可复用组件](REUSABLE_COMPONENTS.md)。
 
 所有数据更新在主线程执行；条目尽量使用不可变 data class。列表快照只复制容器，不深拷贝条目。
 

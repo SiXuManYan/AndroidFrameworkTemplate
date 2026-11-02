@@ -17,6 +17,7 @@ Kotlin + ViewBinding 的 Android Library（`:core_framework`），接入使用�
 
 - UI：Activity / Fragment / Dialog 的 ViewBinding 基类、edge-to-edge、可选 kiosk 全屏。
 - 列表：兼容的 `CommonAdapter` / `MultiViewTypeAdapter`、payload、同步差分与拖拽、异步 `BindingListAdapter`。
+- 通用组件：流式布局、星级评分、数量步进器、网格分页吸附、分割线、加载弹窗及空响应转换器。
 - HTTP：OkHttp / Retrofit 工厂、客户端显式复用、可选认证及版本头、安全概要日志。
 - WebSocket：独立初始化、连接状态、消息事件、指数退避重连与资源释放。
 - 存储：按需创建的 PreferencesManager、DataStore 备份；App 层的通用 Room CRUD 示例。
@@ -26,6 +27,7 @@ Kotlin + ViewBinding 的 Android Library（`:core_framework`），接入使用�
 
 - [快速接入](docs/QUICKSTART.md)：初始化、HTTP、WebSocket、存储和 UI。
 - [RecyclerView](docs/RECYCLERVIEW.md)：适配器选择、差分、payload、拖拽。
+- [可复用组件](docs/REUSABLE_COMPONENTS.md)：控件、分页吸附、分割线、弹窗与工具示例。
 - [分包与职责](docs/ARCHITECTURE.md)：框架与业务边界。
 - [旧版迁移](docs/MIGRATION.md)：删除的业务模板与接口变化。
 - [开发约束](AGENTS.md)：脱敏、安全、注释与验证约定。
@@ -34,4 +36,8 @@ Kotlin + ViewBinding 的 Android Library（`:core_framework`），接入使用�
 
 当前配置：AGP 8.13.2、Gradle 8.13、Kotlin 2.0.21、KSP 2.0.21-1.0.27、compileSdk / targetSdk 36、minSdk 29。版本以 `gradle/libs.versions.toml`、Wrapper 和模块构建文件为准；升级前查阅 [Android 官方兼容说明](https://developer.android.com/build/releases/gradle-plugin)。
 
+仓库通过 `gradle/gradle-daemon-jvm.properties` 与 Foojay 配置 JetBrains JDK 17；这是 Gradle 运行 JDK，不等同于各模块的 JVM 字节码目标。接入源码 Library 时使用宿主工程的工具链，不需要复制示例 App 或 daemon 配置。
+
 此次改动仅做源码、资源、脱敏和文档一致性检查，**未执行 Gradle 构建、测试或安装**。请在 Android Studio 验证示例列表、独立 HTTP/WS 启动及 Room 代码生成；HTTP/WS 联调需要自己的后端。
+
+许可证：[MIT](LICENSE)。

@@ -10,13 +10,19 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 
 /**
- * 通用 edge-to-edge 系统栏适配。
+ * Applies edge-to-edge drawing while preserving readable, inset-safe content.
  *
- * 状态栏和导航栏保持可用，页面背景延伸到系统栏区域，内容则通过 padding
- * 避让刘海、状态栏和手势导航区域。需要 kiosk 模式时显式使用 [FullScreenUtils]。
+ * System bars remain available. The original content padding is captured once and combined with
+ * system-bar and display-cutout insets. Use [FullScreenUtils] for kiosk screens.
+ * - 中文：背景延伸到系统栏，内容通过 padding 自动避让状态栏、导航栏和刘海区域。
  */
 object SystemBarUtils {
 
+    /**
+     * Configures [activity] and applies safe-area padding to [contentView].
+     *
+     * Call once for a given content view; repeated calls capture already-adjusted padding.
+     */
     @Suppress("DEPRECATION")
     fun applyEdgeToEdge(activity: Activity, contentView: View) {
         val window = activity.window
