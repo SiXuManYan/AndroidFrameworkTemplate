@@ -26,34 +26,34 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="@string/server_ip_label"
+            android:text="@string/http_url_label"
             android:textSize="14sp" />
 
         <EditText
-            android:id="@+id/et_ip"
+            android:id="@+id/et_http_url"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:hint="@string/server_ip_hint"
+            android:hint="@string/http_url_hint"
             android:importantForAutofill="no"
-            android:inputType="text"
+            android:inputType="textUri"
             android:singleLine="true" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="@string/server_port_label"
+            android:text="@string/websocket_url_label"
             android:textSize="14sp" />
 
         <EditText
-            android:id="@+id/et_port"
+            android:id="@+id/et_websocket_url"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:hint="@string/server_port_hint"
+            android:hint="@string/websocket_url_hint"
             android:importantForAutofill="no"
-            android:inputType="number"
+            android:inputType="textUri"
             android:singleLine="true" />
 
         <Button
@@ -70,10 +70,10 @@
             android:background="#22000000" />
 
         <Button
-            android:id="@+id/btn_login"
+            android:id="@+id/btn_request"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/call_login_api" />
+            android:text="@string/call_example_api" />
 
         <View
             android:layout_width="match_parent"
@@ -103,7 +103,19 @@
             android:padding="12dp"
             android:text="@string/status_placeholder"
             android:textSize="12sp"
-            tools:text="Login result: 200 成功" />
+            tools:text="HTTP 和 WebSocket 独立初始化" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/list_hint" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/example_list"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            android:layout_marginTop="8dp" />
 
     </LinearLayout>
 

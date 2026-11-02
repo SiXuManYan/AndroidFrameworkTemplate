@@ -26,8 +26,6 @@ import androidx.viewbinding.ViewBinding
  * }
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 abstract class BaseFragment<VB : ViewBinding> : Fragment() {
 

@@ -10,8 +10,6 @@ import timber.log.Timber
  *
  * 由 [com.template.framework.Framework.init] 自动初始化，业务无需手动调用。
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 object TimberUtil {
 

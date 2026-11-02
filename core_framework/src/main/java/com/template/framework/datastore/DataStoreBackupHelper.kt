@@ -26,8 +26,6 @@ import timber.log.Timber
  * - 防止 DataStore 异常（如升级失败、数据损坏）导致配置丢失
  * - 兼顾新用户（DataStore）与老用户（SharedPreferences）的迁移
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 class DataStoreBackupHelper(
     private val context: Context,
@@ -39,6 +37,10 @@ class DataStoreBackupHelper(
         context.getSharedPreferences(backupPrefsName, Context.MODE_PRIVATE)
 
     private fun isBlankValue(value: String?): Boolean = value.isNullOrBlank()
+
+    /** 只读同步备份，不等待 DataStore；用于首帧前应用语言等轻量设置。 */
+    fun getStringBackup(key: Preferences.Key<String>, defaultValue: String? = null): String? =
+        sharedPreferences.getString(key.name, defaultValue)
 
     // region [保存 - String]
 

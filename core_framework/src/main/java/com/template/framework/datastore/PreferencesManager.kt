@@ -3,7 +3,6 @@ package com.template.framework.datastore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.template.framework.constants.FrameworkConstants
@@ -26,7 +25,7 @@ private val Context.frameworkDataStore: DataStore<Preferences> by preferencesDat
 /**
  * Preferences 管理器
  *
- * 框架默认提供 4 个通用 Key：
+ * 框架提供完整 HTTP/WS URL、Token、语言，以及兼容的 IP/Port Key：
  * - [serverIp]   - 服务器 IP
  * - [serverPort] - 服务器端口
  * - [accessToken] - 访问令牌
@@ -38,12 +37,8 @@ private val Context.frameworkDataStore: DataStore<Preferences> by preferencesDat
  * 通过 [DataStoreBackupHelper] 实现，防止 DataStore 异常导致配置丢失。
  *
  * ## 同步访问
- * 部分场景（如 Activity.onCreate）需要同步获取值，
- * 可调用 [getServerIpSync] / [getServerPortSync] / [getAccessTokenSync] /
- * [getLanguageSync]（内部使用 runBlocking，谨慎使用）。
+ * 旧同步方法内部阻塞等待 DataStore，只适用于后台线程；UI 使用 Flow 或语言备份。
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 open class PreferencesManager(context: Context) {
 
@@ -58,9 +53,17 @@ open class PreferencesManager(context: Context) {
         val SERVER_PORT = stringPreferencesKey(FrameworkConstants.PREF_SERVER_PORT)
         val ACCESS_TOKEN = stringPreferencesKey(FrameworkConstants.PREF_ACCESS_TOKEN)
         val LANGUAGE = stringPreferencesKey(FrameworkConstants.PREF_LANGUAGE)
+        val HTTP_BASE_URL = stringPreferencesKey("http_base_url")
+        val WEBSOCKET_URL = stringPreferencesKey("websocket_url")
     }
 
     // region [Server IP]
+
+    /** 完整 HTTP 地址，协议和路径由业务显式选择，不按 Debug 自动拼接。 */
+    val httpBaseUrl: Flow<String> = backup.getStringFlow(HTTP_BASE_URL, "").map { it.orEmpty() }
+    val webSocketUrl: Flow<String> = backup.getStringFlow(WEBSOCKET_URL, "").map { it.orEmpty() }
+    suspend fun saveHttpBaseUrl(url: String) = backup.putString(HTTP_BASE_URL, url)
+    suspend fun saveWebSocketUrl(url: String) = backup.putString(WEBSOCKET_URL, url)
 
     /** 服务器 IP（Flow，默认为空字符串） */
     val serverIp: Flow<String> = backup.getStringFlow(SERVER_IP, "")
@@ -69,7 +72,7 @@ open class PreferencesManager(context: Context) {
 
     /**
      * 同步读取服务器 IP
-     * 内部使用 runBlocking，应仅在确实需要同步访问时使用（如 Activity.onCreate）
+     * 内部使用 runBlocking，不可在主线程调用
      */
     fun getServerIpSync(): String = runBlocking { backup.getString(SERVER_IP, "") ?: "" }
 
@@ -110,6 +113,9 @@ open class PreferencesManager(context: Context) {
 
     fun getLanguageSync(): String = runBlocking { backup.getString(LANGUAGE, "") ?: "" }
 
+    /** 首帧只读取已有备份；权威值仍通过 language Flow 异步读取。 */
+    fun getLanguageBackup(): String = backup.getStringBackup(LANGUAGE, "") ?: ""
+
     suspend fun saveLanguage(lang: String) = backup.putString(LANGUAGE, lang)
 
     // endregion
@@ -122,5 +128,7 @@ open class PreferencesManager(context: Context) {
         backup.remove(SERVER_PORT)
         backup.remove(ACCESS_TOKEN)
         backup.remove(LANGUAGE)
+        backup.remove(HTTP_BASE_URL)
+        backup.remove(WEBSOCKET_URL)
     }
 }

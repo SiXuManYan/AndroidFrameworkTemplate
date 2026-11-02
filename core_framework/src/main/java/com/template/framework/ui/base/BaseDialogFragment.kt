@@ -32,8 +32,6 @@ import com.template.framework.util.FullScreenUtils
  * - 根布局需要包含 id `R.id.rootLayout`（点击空白区域处理）
  * - 卡片容器需要 id `R.id.cardView`（阻止事件冒泡 + 跟随软键盘上移）
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 abstract class BaseDialogFragment<VB : ViewBinding> : DialogFragment() {
 

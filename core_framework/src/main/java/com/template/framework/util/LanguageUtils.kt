@@ -15,8 +15,6 @@ import java.util.Locale
  * - 提供中/英文切换能力
  * - 通过 [setLanguageSwitchingFlag] / [isLanguageSwitching] 控制「语言切换后淡入动画」标记
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 object LanguageUtils {
 

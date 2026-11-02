@@ -20,8 +20,6 @@ import com.google.gson.annotations.SerializedName
  * suspend fun getUserInfo(): ApiResponse<UserInfo>
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 data class ApiResponse<T>(
     val code: Int,

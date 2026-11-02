@@ -28,8 +28,6 @@ fun Dialog.showFullScreen() {
  * - 允许通过滑动临时显示系统栏
  * - 使用 AndroidX WindowInsets API 兼容各系统版本
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 object FullScreenUtils {
 

@@ -4,10 +4,8 @@ package com.template.framework.constants
  * 框架通用常量
  *
  * 仅保留与业务无关的基础网络/数据/Header 常量。
- * 业务相关 Key、scheme、API 前缀请通过 [com.template.framework.api.FrameworkConfig] 注入。
+ * 业务相关 Key、URL 和协议由 App 定义，不提供真实业务默认值。
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 object FrameworkConstants {
 
@@ -43,13 +41,6 @@ object FrameworkConstants {
 
     /** VersionName 请求头 */
     const val HEADER_VERSION_NAME = "VersionName"
-
-    // endregion
-
-    // region [数据库配置]
-
-    /** 框架数据库名（可通过 FrameworkConfig.databaseName 自定义，本处提供默认值） */
-    const val DATABASE_NAME = "framework_database"
 
     // endregion
 

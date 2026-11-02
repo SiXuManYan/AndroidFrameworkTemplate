@@ -10,8 +10,6 @@ import androidx.annotation.DimenRes
  *
  * 提供 dp/px 互转、屏幕宽高获取等功能。
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 object ScreenUtil {
 

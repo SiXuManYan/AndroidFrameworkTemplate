@@ -14,8 +14,6 @@ import androidx.viewbinding.ViewBinding
 import com.template.framework.Framework
 import com.template.framework.util.LanguageUtils
 import com.template.framework.util.SystemBarUtils
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 
 /**
@@ -36,8 +34,6 @@ import timber.log.Timber
  * }
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
 
@@ -91,11 +87,10 @@ abstract class BaseActivity<VB : ViewBinding> : AppCompatActivity() {
      */
     private fun applyLanguageSettingsSync() {
         runCatching {
-            runBlocking {
-                val lang = Framework.getPreferences().language.first()
-                if (lang.isNotEmpty()) {
-                    LanguageUtils.setLanguage(this@BaseActivity, lang)
-                }
+            // 首帧不等待 DataStore，读取之前双写保存的语言备份。
+            val lang = Framework.getPreferences().getLanguageBackup()
+            if (lang.isNotEmpty()) {
+                LanguageUtils.setLanguage(this@BaseActivity, lang)
             }
         }
     }

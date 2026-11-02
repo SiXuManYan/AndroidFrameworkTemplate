@@ -19,8 +19,6 @@ import timber.log.Timber
  * 1. 调用 [clearToken] 清除本地 token
  * 2. 调用 [onTokenExpired] 通知 App 层跳转登录页
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 class AuthErrorInterceptor(
     private val onTokenExpired: () -> Unit,
@@ -39,9 +37,10 @@ class AuthErrorInterceptor(
         if (response.code == 401) {
             Timber.tag(TAG).e("Token 已过期, 收到 HTTP 401 Unauthorized")
             isTokenExpired = true
-        } else {
+        } else if (response.code == 200 && response.body?.contentType()?.subtype == "json") {
             // 2) HTTP 200 但业务 code == 401
-            val responseBody = response.peekBody(Long.MAX_VALUE)
+            // 只检查有限的 JSON 响应，避免图片、流式或超大正文阻塞请求。
+            val responseBody = response.peekBody(64 * 1024L)
             val contentType = responseBody.contentType()
             if (contentType?.type == "application" && contentType.subtype == "json") {
                 try {
@@ -54,7 +53,7 @@ class AuthErrorInterceptor(
                         }
                     }
                 } catch (e: Exception) {
-                    Timber.tag(TAG).d("解析响应体失败：${e.message}")
+                    Timber.tag(TAG).d("响应不是约定的认证 JSON")
                 }
             }
         }

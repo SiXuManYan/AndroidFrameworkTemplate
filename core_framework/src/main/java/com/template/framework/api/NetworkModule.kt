@@ -2,166 +2,94 @@ package com.template.framework.api
 
 import com.template.framework.Framework
 import com.template.framework.constants.FrameworkConstants
+import com.template.framework.network.HttpConfig
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.security.KeyStore
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManagerFactory
-import javax.net.ssl.X509TrustManager
 
-/**
- * 网络模块
- *
- * 提供 OkHttpClient / Retrofit / ApiService 的工厂方法。
- *
- * ## SSL 证书策略
- * - 默认使用系统信任链和主机名校验
- * - 配置 [FrameworkConfig.sslCertRawResId] 时使用指定的 CA 或服务器证书
- *
- * ## Token 失效回调
- * 通过 [setOnTokenExpired] 或 [com.template.framework.Framework.setOnTokenExpired] 设置。
- *
- * ## 自定义 ApiService
- * 默认提供 [ApiService]；如需更多接口，可在 App 模块自定义并通过 [createApiService] 创建。
- *
- * @author Shiwei Wang
- * @date 2026-02
- */
+/** HTTP 工厂与可选的共享实例；不引用或初始化 WebSocket。 */
 object NetworkModule {
-
+    @Volatile
     private var retrofit: Retrofit? = null
 
-    /**
-     * Token 失效全局回调（AuthErrorInterceptor 触发时调用）
-     */
+    @Volatile
     var onTokenExpired: (() -> Unit)? = null
 
-    /**
-     * 配置 SSL 证书处理
-     *
-     * @param builder OkHttpClient.Builder
-     */
-    fun configureSslSocketFactory(builder: OkHttpClient.Builder) {
-        val config = Framework.getConfig()
-        config.sslCertRawResId?.let { trustCustomCert(builder, it) }
+    /** 显式初始化；重复调用可替换服务地址，已有 Service 实例仍指向旧服务器。 */
+    @Synchronized
+    fun init(config: HttpConfig) {
+        val client = config.client ?: createOkHttpClient(
+            getToken = config.getToken,
+            clearToken = config.clearToken,
+            connectTimeoutSeconds = config.connectTimeoutSeconds,
+            readTimeoutSeconds = config.readTimeoutSeconds,
+            writeTimeoutSeconds = config.writeTimeoutSeconds,
+            debug = config.debug,
+            clientId = config.clientId,
+            includeVersionHeaders = config.includeVersionHeaders,
+            configure = config.configureClient
+        )
+        retrofit = createRetrofit(config.baseUrl, client)
     }
 
-    private fun trustCustomCert(builder: OkHttpClient.Builder, certResId: Int) {
-        try {
-            val certificateFactory = CertificateFactory.getInstance("X.509")
-            val certificate = Framework.getContext().resources
-                .openRawResource(certResId)
-                .use(certificateFactory::generateCertificate)
-
-            val keyStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
-                load(null, null)
-                setCertificateEntry("custom_server", certificate)
-            }
-            val trustManagerFactory = TrustManagerFactory.getInstance(
-                TrustManagerFactory.getDefaultAlgorithm()
-            ).apply { init(keyStore) }
-            val trustManager = trustManagerFactory.trustManagers
-                .filterIsInstance<X509TrustManager>()
-                .single()
-
-            val sslContext = SSLContext.getInstance("TLS")
-            sslContext.init(null, arrayOf(trustManager), java.security.SecureRandom())
-            builder.sslSocketFactory(sslContext.socketFactory, trustManager)
-        } catch (e: Exception) {
-            throw IllegalStateException("服务器证书配置失败", e)
-        }
-    }
-
-    /**
-     * 创建 OkHttpClient
-     *
-     * @param getToken 获取 token 的函数，传 null 则不添加 Authorization
-     * @param clearToken Token 失效时的清除函数，传 null 则不清理
-     */
+    /** 默认无业务拦截器；可供 API、图片加载等显式复用同一连接池。 */
     fun createOkHttpClient(
-        getToken: suspend () -> String? = { null },
-        clearToken: suspend () -> Unit = {}
+        getToken: (suspend () -> String?)? = null,
+        clearToken: (suspend () -> Unit)? = null,
+        connectTimeoutSeconds: Long = FrameworkConstants.CONNECT_TIMEOUT,
+        readTimeoutSeconds: Long = FrameworkConstants.READ_TIMEOUT,
+        writeTimeoutSeconds: Long? = FrameworkConstants.WRITE_TIMEOUT,
+        debug: Boolean = runCatching { Framework.getConfig().debug }.getOrDefault(false),
+        clientId: String? = null,
+        includeVersionHeaders: Boolean = false,
+        configure: (OkHttpClient.Builder.() -> Unit)? = null
     ): OkHttpClient {
         val builder = OkHttpClient.Builder()
-            .connectTimeout(FrameworkConstants.CONNECT_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(FrameworkConstants.READ_TIMEOUT, TimeUnit.SECONDS)
-            .writeTimeout(FrameworkConstants.WRITE_TIMEOUT, TimeUnit.SECONDS)
-            .addInterceptor(HttpLoggingInterceptor())
-            .addInterceptor(VersionInterceptor())
-            .addInterceptor(TokenInterceptor(getToken))
-            .addInterceptor(AuthErrorInterceptor(
-                onTokenExpired = { onTokenExpired?.invoke() },
-                clearToken = clearToken
-            ))
-
-        configureSslSocketFactory(builder)
+            .connectTimeout(connectTimeoutSeconds, TimeUnit.SECONDS)
+            .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
+        writeTimeoutSeconds?.let { builder.writeTimeout(it, TimeUnit.SECONDS) }
+        if (debug) builder.addInterceptor(HttpLoggingInterceptor())
+        if (includeVersionHeaders) builder.addInterceptor(VersionInterceptor())
+        if (getToken != null || clientId != null) {
+            builder.addInterceptor(TokenInterceptor(getToken ?: { null }, clientId))
+        }
+        if (clearToken != null) {
+            builder.addInterceptor(AuthErrorInterceptor({ onTokenExpired?.invoke() }, clearToken))
+        }
+        configure?.invoke(builder)
         return builder.build()
     }
 
-    /**
-     * 创建 Retrofit 实例
-     *
-     * @param baseUrl 服务器基础 URL（格式：http://ip:port 或 https://ip:port），必须以 `/` 结尾
-     */
+    /** 使用现有客户端创建 Retrofit；自动补齐 URL 末尾斜杠。 */
+    fun createRetrofit(baseUrl: String, client: OkHttpClient): Retrofit = Retrofit.Builder()
+        .baseUrl(if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/")
+        .client(client)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    /** 兼容简便工厂；需要复用连接池时优先使用带 client 的重载。 */
     fun createRetrofit(
         baseUrl: String,
-        getToken: suspend () -> String? = { null },
-        clearToken: suspend () -> Unit = {}
-    ): Retrofit {
-        val client = createOkHttpClient(getToken, clearToken)
-        val normalizedBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
-        return Retrofit.Builder()
-            .baseUrl(normalizedBaseUrl)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
+        getToken: (suspend () -> String?)? = null,
+        clearToken: (suspend () -> Unit)? = null
+    ): Retrofit = createRetrofit(baseUrl, createOkHttpClient(getToken, clearToken))
 
-    /**
-     * 创建默认的 ApiService
-     */
-    fun createApiService(
-        baseUrl: String,
-        getToken: suspend () -> String? = { null },
-        clearToken: suspend () -> Unit = {}
-    ): ApiService {
-        return createRetrofit(baseUrl, getToken, clearToken).create(ApiService::class.java)
-    }
+    inline fun <reified T> createApiService(baseUrl: String, client: OkHttpClient): T =
+        createRetrofit(baseUrl, client).create(T::class.java)
 
-    /**
-     * 创建自定义 ApiService
-     *
-     * 使用示例：
-     * ```kotlin
-     * interface MyApi {
-     *     @GET("custom")
-     *     suspend fun getCustom(): ApiResponse<MyData>
-     * }
-     *
-     * val myApi = NetworkModule.createApiService<MyApi>(baseUrl)
-     * ```
-     */
     inline fun <reified T> createApiService(
         baseUrl: String,
-        noinline getToken: suspend () -> String? = { null },
-        noinline clearToken: suspend () -> Unit = {}
-    ): T {
-        return createRetrofit(baseUrl, getToken, clearToken).create(T::class.java)
-    }
+        noinline getToken: (suspend () -> String?)? = null,
+        noinline clearToken: (suspend () -> Unit)? = null
+    ): T = createRetrofit(baseUrl, getToken, clearToken).create(T::class.java)
 
-    /**
-     * 缓存新的 Retrofit 实例
-     */
-    fun cacheRetrofit(retrofit: Retrofit) {
-        this.retrofit = retrofit
-    }
+    /** 未初始化时快速失败，不隐式启动其他能力。 */
+    fun getRetrofit(): Retrofit = retrofit ?: error("HTTP 未初始化，请调用 Framework.initHttp 或 NetworkModule.init")
 
-    /**
-     * 获取缓存的 Retrofit 实例（可能为 null）
-     */
+    fun getClient(): OkHttpClient = getRetrofit().callFactory() as? OkHttpClient
+        ?: error("当前 Retrofit 使用自定义 Call.Factory，不是 OkHttpClient")
+
+    fun cacheRetrofit(retrofit: Retrofit) { this.retrofit = retrofit }
     fun getCachedRetrofit(): Retrofit? = retrofit
 }

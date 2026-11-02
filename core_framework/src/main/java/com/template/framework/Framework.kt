@@ -2,23 +2,25 @@ package com.template.framework
 
 import android.app.Application
 import android.content.Context
-import com.template.framework.api.FrameworkConfig
+import com.template.framework.api.NetworkModule
 import com.template.framework.datastore.PreferencesManager
+import com.template.framework.network.HttpConfig
 import com.template.framework.repository.FrameworkRepository
 import com.template.framework.util.TimberUtil
+import com.template.framework.websocket.WebSocketConfig
+import com.template.framework.websocket.WebSocketManager
 
 /**
  * 框架统一入口
  *
  * 使用步骤：
  * 1. 在 Application.onCreate 中调用 [init]
- * 2. 通过 [getRepository] / [getPreferences] / [getContext] 获取框架能力
+ * 2. 按需调用 [initHttp] / [initWebSocket]，两者互不依赖
+ * 3. 偏好设置与仓库首次访问时创建，不随基础初始化启动
  *
  * 框架依赖运行时配置（版本号、是否 Debug 等），由 App 通过 [init] 注入，
  * 这样框架模块就不需要 BuildConfig.
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 object Framework {
 
@@ -28,11 +30,9 @@ object Framework {
     @Volatile
     private var config: FrameworkConfig? = null
 
-    @Volatile
-    private var repository: FrameworkRepository? = null
+    private val preferencesManager by lazy { PreferencesManager(getContext()) }
 
-    @Volatile
-    private var preferencesManager: PreferencesManager? = null
+    private val repository by lazy { FrameworkRepository(getContext(), getPreferences()) }
 
     /**
      * 初始化框架
@@ -46,17 +46,25 @@ object Framework {
         if (this.application != null) {
             return
         }
-        this.application = app
         this.config = config
 
         // 初始化日志
         TimberUtil.init(config.debug)
 
-        // 初始化偏好设置
-        this.preferencesManager = PreferencesManager(app)
+        // 最后发布初始化状态；此处不启动存储、HTTP 或 WebSocket。
+        this.application = app
+    }
 
-        // 初始化仓库
-        this.repository = FrameworkRepository(app, this.preferencesManager!!)
+    /** 按需初始化共享 HTTP 客户端与 Retrofit，不创建 WebSocket。 */
+    fun initHttp(config: HttpConfig) {
+        getContext()
+        NetworkModule.init(config)
+    }
+
+    /** 按需初始化 WebSocket 客户端，不创建 Retrofit，也不自动连接。 */
+    fun initWebSocket(config: WebSocketConfig): WebSocketManager {
+        getContext()
+        return WebSocketManager.initialize(config)
     }
 
     /**
@@ -79,20 +87,20 @@ object Framework {
      * 获取偏好设置管理器
      */
     fun getPreferences(): PreferencesManager {
-        return preferencesManager ?: throw IllegalStateException("Framework 未初始化")
+        return preferencesManager
     }
 
     /**
      * 获取仓库实例
      */
     fun getRepository(): FrameworkRepository {
-        return repository ?: throw IllegalStateException("Framework 未初始化")
+        return repository
     }
 
     /**
      * Token 失效回调，由 App 层注入（通常用于跳转到登录页）
      */
     fun setOnTokenExpired(callback: () -> Unit) {
-        FrameworkRepository.onTokenExpiredCallback = callback
+        NetworkModule.onTokenExpired = callback
     }
 }

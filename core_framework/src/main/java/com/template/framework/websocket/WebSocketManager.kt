@@ -1,17 +1,16 @@
 package com.template.framework.websocket
 
-import com.template.framework.Framework
-import com.template.framework.api.NetworkModule
-import com.template.framework.api.model.websocket.WebSocketParams
-import com.template.framework.constants.FrameworkConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -19,79 +18,51 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
-import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
-/**
- * WebSocket 管理器（单例）
- *
- * 特性：
- * - 自动重连（指数退避可定制）
- * - 状态 / 消息以 [StateFlow] 形式暴露，方便 ViewModel 收集
- * - 复用 NetworkModule 的 SSL 配置（HTTPS / WSS 共享）
- * - 同一服务器多次调用 connect 不会重复连接
- *
- * 使用示例：
- * ```kotlin
- * val manager = WebSocketManager.getInstance()
- *
- * // 1) 连接
- * manager.connect(ip = "192.168.1.1", port = "8080", snNumber = "SN001")
- *
- * // 2) 监听状态
- * lifecycleScope.launch {
- *     manager.connectionState.collect { state -> ... }
- * }
- *
- * // 3) 监听消息
- * lifecycleScope.launch {
- *     manager.messageFlow.collect { message -> ... }
- * }
- *
- * // 4) 发送消息
- * manager.sendMessage("""{"type":"ping"}""")
- *
- * // 5) 断开
- * manager.disconnect()
- * ```
- *
- * @author Shiwei Wang
- * @date 2026-02
- */
-class WebSocketManager private constructor() {
-
+/** 独立 WebSocket 管理器：按需连接、指数退避重连，不依赖 HTTP 模块或 Framework。 */
+class WebSocketManager private constructor(private val config: WebSocketConfig) {
     companion object {
-        private const val TAG = "WebSocket"
-
         @Volatile
-        private var INSTANCE: WebSocketManager? = null
+        private var instance: WebSocketManager? = null
 
-        fun getInstance(): WebSocketManager {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: WebSocketManager().also { INSTANCE = it }
-            }
+        /** 替换全局管理器并释放旧连接；这里只配置客户端，不连接服务器。 */
+        @Synchronized
+        fun initialize(config: WebSocketConfig): WebSocketManager {
+            val next = create(config)
+            instance?.release()
+            return next.also { instance = it }
         }
+
+        /** 多连接场景由调用方持有和释放独立实例。 */
+        fun create(config: WebSocketConfig): WebSocketManager = WebSocketManager(config)
+
+        fun getInstance(): WebSocketManager = instance
+            ?: error("WebSocket 未初始化，请调用 Framework.initWebSocket 或 WebSocketManager.initialize")
     }
 
-    private var webSocket: WebSocket? = null
-    private var client: OkHttpClient? = null
-    private var reconnectJob: Job? = null
+    private val ownsClient = config.client == null
+    private val client = config.client ?: OkHttpClient.Builder()
+        .pingInterval(config.pingIntervalSeconds, TimeUnit.SECONDS)
+        .apply { config.configureClient?.invoke(this) }
+        .build()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var socket: WebSocket? = null
+    private var reconnectJob: Job? = null
+    private var reconnectAttempt = 0
+    private var generation = 0L
+    private var shouldReconnect = false
+    private var released = false
 
-    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
-    val connectionState: StateFlow<ConnectionState> = _connectionState
+    private val state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
+    val connectionState = state.asStateFlow()
 
-    private val _messageFlow = MutableStateFlow<String?>(null)
-    val messageFlow: StateFlow<String?> = _messageFlow
-
-    /** 当前连接的 IP */
-    private var currentConnectedIp: String? = null
-
-    /** 当前连接的端口 */
-    private var currentConnectedPort: String? = null
-
-    /** 当前连接的 SN 号 */
-    private var currentConnectedSnNumber: String? = null
+    // 消息是事件：相同消息不能去重，页面重建后不重放旧消息；慢消费者最多缓冲 64 条。
+    private val messages = MutableSharedFlow<String>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val messageFlow = messages.asSharedFlow()
 
     sealed class ConnectionState {
         object Disconnected : ConnectionState()
@@ -100,173 +71,112 @@ class WebSocketManager private constructor() {
         data class Error(val message: String) : ConnectionState()
     }
 
-    /**
-     * 连接 WebSocket
-     *
-     * @param ip 服务器 IP
-     * @param port 服务器端口
-     * @param snNumber 设备 SN 号（可选，会作为 Header 传递）
-     * @param forceReconnect 是否强制重连（即使已连接到相同服务器），默认 false
-     */
-    fun connect(ip: String, port: String, snNumber: String? = null, forceReconnect: Boolean = false) {
-        val currentState = _connectionState.value
-
-        // 已连接相同服务器，跳过
-        if (!forceReconnect && currentState is ConnectionState.Connected &&
-            currentConnectedIp == ip && currentConnectedPort == port
-        ) {
-            Timber.tag(TAG).d("WebSocket 已连接 $ip:$port，跳过")
-            return
-        }
-        // 正在连接相同服务器，跳过
-        if (!forceReconnect && currentState is ConnectionState.Connecting &&
-            currentConnectedIp == ip && currentConnectedPort == port
-        ) {
-            Timber.tag(TAG).d("WebSocket 正在连接 $ip:$port，跳过")
-            return
-        }
-
-        val serverChanged = currentConnectedIp != ip || currentConnectedPort != port
-        if (serverChanged || forceReconnect) {
-            if (serverChanged) {
-                disconnect()
-            } else {
-                reconnectJob?.cancel()
-                webSocket?.close(1000, "Force reconnect")
-                webSocket = null
-                client = null
-            }
-        }
-
-        currentConnectedIp = ip
-        currentConnectedPort = port
-        currentConnectedSnNumber = snNumber
-
-        val scheme = if (Framework.getConfig().debug) "ws" else "wss"
-        val apiPrefix = if (Framework.getConfig().debug) {
-            Framework.getConfig().debugApiPrefix
-        } else {
-            Framework.getConfig().releaseApiPrefix
-        }
-        val url = "$scheme://$ip:$port/$apiPrefix/${WebSocketParams.Path.value}"
-
-        Timber.tag(TAG).d("连接 WebSocket: $url")
-        _connectionState.value = ConnectionState.Connecting
-
-        val builder = OkHttpClient.Builder()
-            .connectTimeout(FrameworkConstants.CONNECT_TIMEOUT, TimeUnit.SECONDS)
-            .readTimeout(FrameworkConstants.READ_TIMEOUT, TimeUnit.SECONDS)
-            .writeTimeout(FrameworkConstants.WRITE_TIMEOUT, TimeUnit.SECONDS)
-        NetworkModule.configureSslSocketFactory(builder)
-        client = builder.build()
-
-        val requestBuilder = Request.Builder()
-            .url(url)
-            .header(WebSocketParams.HeaderClientId.value, com.template.framework.api.TokenInterceptor.DEFAULT_CLIENT_ID)
-        val cfg = Framework.getConfig()
-        requestBuilder.header(FrameworkConstants.HEADER_VERSION_CODE, cfg.versionCode.toString())
-        requestBuilder.header(FrameworkConstants.HEADER_VERSION_NAME, cfg.versionName)
-        if (!snNumber.isNullOrEmpty()) {
-            requestBuilder.header(WebSocketParams.HeaderSnNumber.value, snNumber)
-        }
-
-        webSocket = client?.newWebSocket(requestBuilder.build(), createWebSocketListener())
-    }
-
-    /**
-     * 断开连接
-     *
-     * @param stopReconnect 是否停止自动重连，默认 true
-     */
-    fun disconnect(stopReconnect: Boolean = true) {
-        if (stopReconnect) {
-            reconnectJob?.cancel()
-            reconnectJob = null
-        }
-        webSocket?.close(1000, "Normal closure")
-        webSocket = null
-        client = null
-        if (stopReconnect) {
-            currentConnectedIp = null
-            currentConnectedPort = null
-            currentConnectedSnNumber = null
-        }
-        _connectionState.value = ConnectionState.Disconnected
-    }
-
-    /**
-     * 发送消息
-     *
-     * @return 是否发送成功（false 表示未连接或连接已关闭）
-     */
-    fun sendMessage(message: String): Boolean {
-        return webSocket?.send(message) ?: false
-    }
-
-    /**
-     * 启动自动重连协程
-     */
-    private fun startReconnect() {
+    /** 重复连接会被忽略；forceReconnect 可用于刷新认证 Header。 */
+    @Synchronized
+    fun connect(forceReconnect: Boolean = false) {
+        check(!released) { "WebSocketManager 已释放，请创建新实例" }
+        if (!forceReconnect && (state.value is ConnectionState.Connected || state.value is ConnectionState.Connecting)) return
         reconnectJob?.cancel()
+        reconnectJob = null
+        shouldReconnect = config.autoReconnect
+        generation++
+        val activeGeneration = generation
+        // 旧连接回调会迟到，先递增代次再取消，避免旧回调污染新连接状态。
+        socket?.cancel()
+        socket = null
+        state.value = ConnectionState.Connecting
+        try {
+            val request = Request.Builder().url(config.url).apply {
+                config.headers().forEach { (name, value) -> header(name, value) }
+            }.build()
+            socket = client.newWebSocket(request, listener(activeGeneration))
+        } catch (e: Exception) {
+            state.value = ConnectionState.Error(e.javaClass.simpleName)
+            scheduleReconnect()
+        }
+    }
+
+    @Synchronized
+    fun disconnect() {
+        shouldReconnect = false
+        generation++
+        reconnectJob?.cancel()
+        reconnectJob = null
+        reconnectAttempt = 0
+        socket?.cancel()
+        socket = null
+        state.value = ConnectionState.Disconnected
+    }
+
+    /** true 仅表示进入发送队列，不代表服务器已收到。 */
+    @Synchronized
+    fun sendMessage(message: String): Boolean =
+        if (state.value is ConnectionState.Connected) socket?.send(message) ?: false else false
+
+    private fun scheduleReconnect() {
+        if (!shouldReconnect || released || reconnectJob?.isActive == true) return
+        // 首次握手失败也会重试，延迟有上限，避免失败时紧密循环。
+        val factor = 1L shl reconnectAttempt.coerceAtMost(20)
+        val waitMillis = if (config.reconnectIntervalMillis > config.maxReconnectIntervalMillis / factor) {
+            config.maxReconnectIntervalMillis
+        } else {
+            (config.reconnectIntervalMillis * factor).coerceAtMost(config.maxReconnectIntervalMillis)
+        }
+        reconnectAttempt = (reconnectAttempt + 1).coerceAtMost(20)
         reconnectJob = scope.launch {
-            while (currentConnectedIp != null && currentConnectedPort != null) {
-                val state = _connectionState.value
-                if (state is ConnectionState.Disconnected || state is ConnectionState.Error) {
-                    val ip = currentConnectedIp ?: break
-                    val port = currentConnectedPort ?: break
-                    val snNumber = currentConnectedSnNumber
-                    Timber.tag(TAG).d("WebSocket 断开，尝试自动重连 $ip:$port")
-                    delay(FrameworkConstants.WS_RECONNECT_INTERVAL)
-                    connect(ip, port, snNumber)
-                } else {
-                    delay(FrameworkConstants.WS_RECONNECT_INTERVAL)
-                }
+            delay(waitMillis)
+            synchronized(this@WebSocketManager) {
+                reconnectJob = null
+                if (shouldReconnect && !released) connect()
             }
         }
     }
 
-    private fun createWebSocketListener(): WebSocketListener {
-        return object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                Timber.tag(TAG).d("WebSocket connected")
-                _connectionState.value = ConnectionState.Connected
-                startReconnect()
+    private fun listener(activeGeneration: Long) = object : WebSocketListener() {
+        private fun withActiveConnection(block: () -> Unit) {
+            synchronized(this@WebSocketManager) {
+                if (!released && activeGeneration == generation) block()
             }
+        }
 
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                Timber.tag(TAG).d("Received: $text")
-                _messageFlow.value = text
-            }
+        override fun onOpen(webSocket: WebSocket, response: Response) = withActiveConnection {
+            reconnectAttempt = 0
+            state.value = ConnectionState.Connected
+        }
 
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                _messageFlow.value = bytes.utf8()
-            }
+        override fun onMessage(webSocket: WebSocket, text: String) = withActiveConnection {
+            messages.tryEmit(text)
+        }
 
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                Timber.tag(TAG).d("WebSocket closing: $code $reason")
-            }
+        override fun onMessage(webSocket: WebSocket, bytes: ByteString) = onMessage(webSocket, bytes.utf8())
 
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                Timber.tag(TAG).d("WebSocket closed: $code $reason")
-                if (currentConnectedIp != null && currentConnectedPort != null) {
-                    _connectionState.value = ConnectionState.Disconnected
-                }
-            }
+        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) = withActiveConnection {
+            webSocket.close(code, reason)
+        }
 
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Timber.tag(TAG).e(t, "WebSocket failure: ${t.message}")
-                if (currentConnectedIp != null && currentConnectedPort != null) {
-                    _connectionState.value = ConnectionState.Error(t.message ?: "Unknown error")
-                }
-            }
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = withActiveConnection {
+            socket = null
+            state.value = ConnectionState.Disconnected
+            scheduleReconnect()
+        }
+
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = withActiveConnection {
+            socket = null
+            state.value = ConnectionState.Error(t.javaClass.simpleName)
+            scheduleReconnect()
         }
     }
 
-    /**
-     * 释放资源
-     */
+    /** 释放后不可复用；不关闭调用方传入的共享客户端。 */
+    @Synchronized
     fun release() {
+        if (released) return
         disconnect()
+        released = true
         scope.cancel()
+        if (ownsClient) {
+            client.connectionPool.evictAll()
+            client.dispatcher.executorService.shutdown()
+        }
     }
 }

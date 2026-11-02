@@ -23,6 +23,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AristonVsop"
+rootProject.name = "AndroidFrameworkTemplate"
 include(":app")
 include(":core_framework")

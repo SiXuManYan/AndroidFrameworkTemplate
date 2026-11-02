@@ -1,167 +1,120 @@
 package com.template.framework.ui.base
 
-import android.annotation.SuppressLint
-import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.annotation.StringRes
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
+import com.template.framework.ui.recyclerview.MutableDataAdapter
 
-/**
- * 多布局 RecyclerView 通用适配器基类（多 ViewBinding）
- *
- * 当 RecyclerView 的 item 有多种布局时使用。
- *
- * 使用示例：
- * ```kotlin
- * class MultiAdapter : MultiViewTypeAdapter<ListItem>() {
- *     override fun getItemViewType(position: Int): Int = dataList[position].type.ordinal
- *
- *     override fun onCreateBinding(inflater, parent, viewType): ViewBinding = when (viewType) {
- *         TYPE_A -> ItemABinding.inflate(inflater, parent, false)
- *         TYPE_B -> ItemBBinding.inflate(inflater, parent, false)
- *         else -> throw IllegalArgumentException("Unknown viewType")
- *     }
- *
- *     override fun onBind(binding: ViewBinding, item: ListItem, position: Int, viewType: Int) {
- *         when (binding) {
- *             is ItemABinding -> binding.tvA.text = item.name
- *             is ItemBBinding -> binding.tvB.text = item.name
- *         }
- *     }
- * }
- * ```
- *
- * @author Shiwei Wang
- * @date 2026-02
- */
-abstract class MultiViewTypeAdapter<T> : RecyclerView.Adapter<MultiViewTypeAdapter<T>.BindingViewHolder>() {
-
-    protected var context: Context? = null
-
-    protected val dataList: MutableList<T> = mutableListOf()
+/** 多布局 ViewBinding 适配器；可选同步 DiffUtil，保留旧类名及 BindingViewHolder 类型。 */
+abstract class MultiViewTypeAdapter<T>(diffCallback: DiffUtil.ItemCallback<T>? = null) :
+    MutableDataAdapter<T, MultiViewTypeAdapter<T>.BindingViewHolder>(diffCallback) {
 
     private var currentHolder: BindingViewHolder? = null
-
     private var onItemClickListener: OnItemClickListener<T>? = null
     private var onItemLongClickListener: OnItemLongClickListener<T>? = null
     private var onItemChildClickListener: OnItemChildClickListener<T>? = null
 
     protected abstract fun onCreateBinding(inflater: LayoutInflater, parent: ViewGroup, viewType: Int): ViewBinding
-
     protected abstract fun onBind(binding: ViewBinding, item: T, position: Int, viewType: Int)
 
+    /** 未处理的 payload 默认回退完整绑定，子类可只更新收藏图标或选中状态。 */
+    protected open fun onBindPayloads(binding: ViewBinding, item: T, position: Int, viewType: Int, payloads: List<Any>) {
+        currentHolder?.let { clearClicks(it); installItemClicks(it, true) }
+        onBind(binding, item, position, viewType)
+    }
+
+    /** 回收时取消图片任务或清理资源，不在 Adapter 中长期持有页面。 */
+    protected open fun onBindingRecycled(binding: ViewBinding) {}
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BindingViewHolder {
-        val binding = onCreateBinding(LayoutInflater.from(parent.context), parent, viewType)
         context = parent.context
-        return BindingViewHolder(binding, viewType)
+        return BindingViewHolder(onCreateBinding(LayoutInflater.from(parent.context), parent, viewType), viewType)
     }
 
     override fun onBindViewHolder(holder: BindingViewHolder, position: Int) {
-        if (position < 0 || position >= dataList.size) return
-        val item = dataList[position]
+        if (position !in dataList.indices) return
+        clearClicks(holder)
+        installItemClicks(holder, true)
+        bindHolder(holder) { onBind(holder.binding, dataList[position], position, holder.viewType) }
+    }
+
+    override fun onBindViewHolder(holder: BindingViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isEmpty()) {
+            onBindViewHolder(holder, position)
+        } else if (position in dataList.indices) {
+            bindHolder(holder) {
+                onBindPayloads(holder.binding, dataList[position], position, holder.viewType, payloads)
+            }
+        }
+    }
+
+    private fun bindHolder(holder: BindingViewHolder, bind: () -> Unit) {
         currentHolder = holder
-
-        onBind(holder.binding, item, position, holder.viewType)
-
-        holder.itemView.setOnClickListener { v -> onItemClickListener?.onItemClick(item, position, v) }
-        holder.itemView.setOnLongClickListener { v ->
-            onItemLongClickListener?.onItemLongClick(item, position, v)
-            true
-        }
+        try { bind() } finally { currentHolder = null }
+        installItemClicks(holder)
         holder.childClickViews.forEach { child ->
-            child.setOnClickListener { v -> onItemChildClickListener?.onItemChildClick(item, position, v, v.id) }
+            child.setOnClickListener { view ->
+                withCurrentItem(holder) { item, index -> onItemChildClickListener?.onItemChildClick(item, index, view, view.id) }
+            }
         }
     }
 
-    override fun getItemCount(): Int = dataList.size
-
-    @SuppressLint("NotifyDataSetChanged")
-    fun setNewDataList(list: List<T>?) {
-        dataList.clear()
-        list?.let { dataList.addAll(it) }
-        notifyDataSetChanged()
+    private fun installItemClicks(holder: BindingViewHolder, installDefaults: Boolean = false) {
+        // 默认分派在业务绑定前安装，支持绑定后设置监听；业务仍可覆盖未注册的事件。
+        if (installDefaults || onItemClickListener != null) {
+            holder.itemView.setOnClickListener { view ->
+                withCurrentItem(holder) { item, index -> onItemClickListener?.onItemClick(item, index, view) }
+            }
+        }
+        if (installDefaults || onItemLongClickListener != null) {
+            holder.itemView.setOnLongClickListener { view ->
+                val listener = onItemLongClickListener ?: return@setOnLongClickListener false
+                val index = holder.bindingAdapterPosition
+                if (index == RecyclerView.NO_POSITION || index !in dataList.indices) false else {
+                    listener.onItemLongClick(dataList[index], index, view)
+                    true
+                }
+            }
+        }
     }
 
-    @SuppressLint("NotifyDataSetChanged")
-    fun addDataList(list: List<T>?) {
-        list?.let { dataList.addAll(it); notifyDataSetChanged() }
+    private fun withCurrentItem(holder: BindingViewHolder, action: (T, Int) -> Unit) {
+        // 插入、删除和拖动后，绑定时的位置已过时；ConcatAdapter 使用子适配器位置。
+        val index = holder.bindingAdapterPosition
+        if (index != RecyclerView.NO_POSITION && index in dataList.indices) action(dataList[index], index)
     }
 
-    fun addItem(item: T) {
-        dataList.add(item)
-        notifyItemInserted(dataList.size - 1)
+    override fun onViewRecycled(holder: BindingViewHolder) {
+        clearClicks(holder)
+        onBindingRecycled(holder.binding)
+        super.onViewRecycled(holder)
     }
 
-    fun insertItem(position: Int, item: T) {
-        if (position < 0 || position > dataList.size) return
-        dataList.add(position, item)
-        notifyItemInserted(position)
+    private fun clearClicks(holder: BindingViewHolder) {
+        holder.childClickViews.forEach { it.setOnClickListener(null) }
+        holder.childClickViews.clear()
+        holder.itemView.setOnClickListener(null)
+        holder.itemView.setOnLongClickListener(null)
     }
 
-    fun deleteItem(position: Int) {
-        if (position < 0 || position >= dataList.size) return
-        dataList.removeAt(position)
-        notifyItemRemoved(position)
-    }
+    /** 只在 onBind / onBindPayloads 中注册；重复视图不会重复添加。 */
+    protected fun bindChildClickListener(vararg views: View) { currentHolder?.bindChildClickListener(*views) }
 
-    fun updateItem(position: Int, item: T) {
-        if (position < 0 || position >= dataList.size) return
-        dataList[position] = item
-        notifyItemChanged(position)
-    }
+    fun setOnItemClickListener(listener: OnItemClickListener<T>?) { onItemClickListener = listener }
+    fun setOnItemLongListener(listener: OnItemLongClickListener<T>?) { onItemLongClickListener = listener }
+    fun setOnItemChildClickListener(listener: OnItemChildClickListener<T>?) { onItemChildClickListener = listener }
 
-    fun isEmpty(): Boolean = dataList.isEmpty()
-    fun isNotEmpty(): Boolean = dataList.isNotEmpty()
-
-    fun getString(@StringRes resId: Int): String = context?.getString(resId) ?: ""
-
-    fun getAllData(): List<T> = dataList.toList()
-
-    @SuppressLint("NotifyDataSetChanged")
-    fun clearAllData() {
-        dataList.clear()
-        notifyDataSetChanged()
-    }
-
-    protected fun bindChildClickListener(vararg views: View) {
-        currentHolder?.bindChildClickListener(*views)
-    }
-
-    fun setOnItemClickListener(listener: OnItemClickListener<T>?) {
-        this.onItemClickListener = listener
-    }
-
-    fun setOnItemLongListener(listener: OnItemLongClickListener<T>?) {
-        this.onItemLongClickListener = listener
-    }
-
-    fun setOnItemChildClickListener(listener: OnItemChildClickListener<T>?) {
-        this.onItemChildClickListener = listener
-    }
-
-    inner class BindingViewHolder(
-        val binding: ViewBinding,
-        val viewType: Int
-    ) : RecyclerView.ViewHolder(binding.root) {
+    inner class BindingViewHolder(val binding: ViewBinding, val viewType: Int) : RecyclerView.ViewHolder(binding.root) {
         val childClickViews: MutableList<View> = mutableListOf()
-
         fun bindChildClickListener(vararg views: View) {
-            childClickViews.addAll(views)
+            views.forEach { if (it !in childClickViews) childClickViews.add(it) }
         }
     }
 
-    fun interface OnItemClickListener<T> {
-        fun onItemClick(item: T, position: Int, v: View)
-    }
-
-    fun interface OnItemChildClickListener<T> {
-        fun onItemChildClick(item: T, position: Int, view: View, viewId: Int)
-    }
-
-    fun interface OnItemLongClickListener<T> {
-        fun onItemLongClick(item: T, position: Int, v: View)
-    }
+    fun interface OnItemClickListener<T> { fun onItemClick(item: T, position: Int, v: View) }
+    fun interface OnItemChildClickListener<T> { fun onItemChildClick(item: T, position: Int, view: View, viewId: Int) }
+    fun interface OnItemLongClickListener<T> { fun onItemLongClick(item: T, position: Int, v: View) }
 }

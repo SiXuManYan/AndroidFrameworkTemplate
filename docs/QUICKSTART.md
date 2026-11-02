@@ -1,305 +1,142 @@
-# 接入新项目指南
+# 快速接入
 
-> 在 5 分钟内基于此模板创建新项目。
+## 0. 在自己的 App 中依赖 Library
 
-## 步骤 1：复制模板
+只复制 `core_framework`，不复制本仓库的示例 `app`。在使用者工程的 `settings.gradle.kts` 添加：
 
-```bash
-cp -r AristonVsop my-new-project
-cd my-new-project
+```kotlin
+include(":core_framework")
 ```
 
-清理模板的演示资源：
-- 删除 `app/src/main/java/com/example/template/MainActivity.kt`（保留 `App.kt`）
-- 删除 `app/src/main/res/layout/activity_main.xml`
+在使用者的 App `build.gradle.kts` 中添加：
 
-## 步骤 2：重命名包名
-
-全局替换以下字符串：
-- `com.example.template` → 你的应用包名，如 `com.mycompany.myapp`
-- `com.template.framework` → 通常保持不变（如需修改，需同步修改 `core_framework/` 所有文件的 package）
-
-修改位置：
-1. `app/build.gradle.kts` - `namespace` 和 `applicationId`
-2. `app/src/main/AndroidManifest.xml` - `.App` 和 `.MainActivity`
-3. `core_framework/build.gradle.kts` - `namespace`（如要改 framework 包名）
-
-## 步骤 3：配置签名与版本
-
-修改 `app/build.gradle.kts`：
 ```kotlin
-defaultConfig {
-    applicationId = "com.mycompany.myapp"
-    versionCode = 1
-    versionName = "1.0.0"
-}
-
-signingConfigs {
-    create("release") {
-        storeFile = file("my-release.jks")
-        storePassword = "..."
-        keyAlias = "..."
-        keyPassword = "..."
-    }
-}
+dependencies { implementation(project(":core_framework")) }
+android { buildFeatures { viewBinding = true } }
 ```
 
-## 步骤 4：在 FrameworkConfig 中配置运行时参数
+库构建文件使用 `libs` 版本目录：将其用到的别名合并到使用者的 `gradle/libs.versions.toml`，或改为使用者已有依赖坐标和插件版本。不要覆盖整个工程的版本目录；统一 AGP/Kotlin 与 SDK 要求，最低支持 API 29。
 
-修改 `app/src/main/java/com/mycompany/myapp/App.kt`：
+公开 API 的 AppCompat、Lifecycle、RecyclerView、Retrofit、OkHttp、Gson、DataStore 和协程类型通过 `api` 暴露。使用者自己添加 Room 时才需要 Room / KSP；库不需要依赖示例 App。当前未发布 Maven 坐标；手动复制 AAR 不会携带依赖元数据，优先使用源码模块接入。
+
+## 1. 基础初始化
+
+在自己的 Application 中配置，并在 Manifest 设置 `android:name`：
+
 ```kotlin
+import com.template.framework.Framework
+import com.template.framework.FrameworkConfig
+
 Framework.init(
-    app = this,
-    config = FrameworkConfig(
-        debug = BuildConfig.DEBUG,
-        versionCode = BuildConfig.VERSION_CODE,
-        versionName = BuildConfig.VERSION_NAME,
-        sslCertRawResId = R.raw.my_cert,  // 可选；为空时使用系统信任链
-        debugApiPrefix = "dev-api",
-        releaseApiPrefix = "prod-api"
-    )
+    this,
+    FrameworkConfig(BuildConfig.DEBUG, BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME)
 )
 ```
 
-## 步骤 5：实现业务
+仅首次初始化生效。不启动 HTTP、WebSocket 或 Room；偏好设置在 `getPreferences()` 时才创建。业务不必使用 `getRepository()`，优先组合自己的 API 与存储。
 
-### 5.1 定义业务接口
-在 `core_framework/src/main/java/com/template/framework/api/` 下添加：
+## 2. HTTP：按需选择一种方式
+
+需要共享的 Retrofit 时：
+
 ```kotlin
-interface MyApi {
-    @GET("user/profile")
-    suspend fun getProfile(): ApiResponse<UserProfile>
+import com.template.framework.api.NetworkModule
+import com.template.framework.network.HttpConfig
 
-    @POST("user/update")
-    suspend fun updateProfile(@Body request: UpdateProfileRequest): ApiResponse<Unit>
-}
+Framework.initHttp(HttpConfig(
+    baseUrl = "https://com.exmpale.xxxx/", // 替换为自己的后端
+    debug = BuildConfig.DEBUG
+))
+val api = NetworkModule.getRetrofit().create(ExampleApi::class.java)
+// ExampleApi 参考本仓库 app/data/api，然后在自己的 App 中定义接口。
 ```
 
-### 5.2 创建自定义 Repository
-在 `app/src/main/java/com/mycompany/myapp/data/` 下添加：
+只需要 OkHttp，或希望多个 API / 图片加载共享连接池时，不必调用 `initHttp`：
+
 ```kotlin
-class AppRepository private constructor(context: Context) : FrameworkRepository(context, Framework.getPreferences()) {
-
-    suspend fun getProfile(): ApiResponse<UserProfile> =
-        NetworkModule.createApiService<MyApi>(getCurrentBaseUrl()).getProfile()
-
-    companion object {
-        @Volatile private var INSTANCE: AppRepository? = null
-        fun getInstance(context: Context): AppRepository =
-            INSTANCE ?: synchronized(this) {
-                INSTANCE ?: AppRepository(context.applicationContext).also { INSTANCE = it }
-            }
-    }
-}
-```
-
-### 5.3 实现 Activity
-```kotlin
-class ProfileActivity : BaseActivity<ActivityProfileBinding>() {
-    override fun initViewBinding() = ActivityProfileBinding.inflate(layoutInflater)
-    override fun initView() { /* 初始化视图 */ }
-    override fun initListener() { /* 设置监听 */ }
-    override fun initData() {
-        lifecycleScope.launch {
-            val response = AppRepository.getInstance(this@ProfileActivity).getProfile()
-            if (response.isSuccess) {
-                binding.tvName.text = response.data?.name
-            }
-        }
-    }
-}
-```
-
-### 5.4 配置 Android 12 SplashScreen
-
-模板的 `MainActivity` 已包含 `installSplashScreen()`，Manifest 使用
-`Theme.Template.Starting` 作为启动主题。替换启动图标或背景色时，修改
-`app/src/main/res/values/themes.xml` 中的 `windowSplashScreenAnimatedIcon`
-和 `windowSplashScreenBackground` 即可，不需要额外创建 SplashActivity。
-
-## 常见问题
-
-### Q1: 如何修改 DataStore 文件名？
-修改 `core_framework/src/main/java/com/template/framework/datastore/PreferencesManager.kt`：
-```kotlin
-private val Context.frameworkDataStore: DataStore<Preferences> by preferencesDataStore(
-    name = "my_app_preferences"  // 修改此处
+val client = NetworkModule.createOkHttpClient(
+    connectTimeoutSeconds = 10,
+    readTimeoutSeconds = 20,
+    writeTimeoutSeconds = null, // 保留 OkHttp 默认写超时
+    debug = BuildConfig.DEBUG
 )
+val api = NetworkModule.createApiService<ExampleApi>("https://com.exmpale.xxxx/", client)
 ```
 
-### Q2: 如何添加自定义 DataStore Key？
-在 `App` 模块中继承 `PreferencesManager`：
-```kotlin
-class AppPreferences(context: Context) : PreferencesManager(context) {
-    val userId: Flow<String?> = ... // 自定义 Key
-}
-```
-
-### Q3: 如何禁用 BaseActivity 的语言自动应用？
-子类覆盖：
-```kotlin
-class MyActivity : BaseActivity<ActivityMyBinding>() {
-    // 默认行为即可，或重写 applyLanguageSettingsSync
-}
-```
-
-### Q4: 如何让 WebSocket 自动连接？
-在 Application.onCreate 或登录成功后：
-```kotlin
-Framework.getRepository().connectWebSocket(ip = "192.168.1.1", port = "8080")
-```
-
-### Q5: Token 失效如何跳转到登录页？
-在 Application.onCreate 中注入：
-```kotlin
-Framework.setOnTokenExpired {
-    // 跳转到登录页
-    startActivity(Intent(this, LoginActivity::class.java))
-}
-```
-
-### Q6: Release 模式如何配置 SSL 证书？
-1. 将证书文件放到 `app/src/main/res/raw/my_cert.crt`
-2. `FrameworkConfig.sslCertRawResId = R.raw.my_cert`
-
-默认使用系统信任链和主机名校验。Debug 连接自签名 HTTPS/WSS 服务时，同样通过
-`sslCertRawResId` 提供可信证书，不建议关闭证书或主机名校验。
-
-### Q7: 如何添加自定义数据库实体？
-在 `app/src/main/java/com/mycompany/myapp/data/db/` 下创建：
-```kotlin
-@Database(
-    entities = [...],
-    version = 2,
-    exportSchema = false
-)
-abstract class AppDatabase : FrameworkDatabase() {
-    abstract fun myDao(): MyDao
-}
-```
-
-### Q8: 如何启用平板 kiosk 全屏？
-
-`BaseActivity` 默认采用适合手机和平板的 edge-to-edge 布局，并保留系统栏。
-只在确实需要隐藏状态栏和导航栏的页面显式调用：
+默认没有认证、客户端 ID 或版本 Header。需要认证时提供 `getToken` / `clearToken`，需要版本头时启用 `includeVersionHeaders`。示例 `ApiResponse` 仅适用于 `{code, msg, data}`，不同后端直接定义自己的响应模型。
 
 ```kotlin
-FullScreenUtils.enableFullScreen(this)
+val preferences = Framework.getPreferences()
+Framework.setOnTokenExpired { /* 回调在请求线程触发，UI 操作切到主线程 */ }
+Framework.initHttp(HttpConfig(
+    baseUrl = "https://com.exmpale.xxxx/",
+    getToken = { preferences.accessToken.first() }, // import kotlinx.coroutines.flow.first
+    clearToken = { preferences.clearAccessToken() },
+    includeVersionHeaders = true,
+    debug = BuildConfig.DEBUG
+))
 ```
 
----
-## 其他：工具链版本兼容与升级
+提供 `HttpConfig.client` 时，该客户端的拦截器、超时和 TLS 均保持原样，其他客户端构建选项不再自动应用。重复初始化可更换 URL，但已创建的 API 不会自动切换，必须重新创建。
 
-Android 工具链不是所有版本都可以独立升级。建议先确定 Android Studio/AGP，再确定
-Gradle 和 JDK，最后配套 Kotlin/KSP；`compileSdk` 和 `targetSdk` 则根据目标 Android
-平台单独评估。
-
-官方兼容资料：
-
-- [Android Studio 与 AGP 兼容表](https://developer.android.com/studio/releases#android_gradle_plugin_and_android_studio_compatibility)
-- [AGP 与 Gradle/JDK 兼容要求](https://developer.android.com/build/releases/about-agp?hl=zh-cn)
-- [AGP 发布说明与 API 支持](https://developer.android.com/build/releases/gradle-plugin)
-- [Android Kotlin 支持表（Kotlin 与最低 AGP）](https://developer.android.com/build/kotlin-support?hl=zh-cn)
-- [Android SDK 平台与 API Level](https://developer.android.com/tools/releases/platforms)
-- [KSP 官方版本发布页](https://github.com/google/ksp/releases)
-
-### AGP 与 Gradle 版本对应关系
-
-下表中的 Gradle 是该 AGP 系列要求的**最低 Gradle 版本**，不是“任意更高版本都一定
-兼容”。实际升级时应优先采用对应 AGP 发布说明中验证过的 Gradle 版本。AGP 8.x
-运行 Gradle 时至少需要 JDK 17。
-
-| Android Gradle Plugin | 最低 Gradle 版本 | 最低 Gradle JDK |
-| --- | --- | --- |
-| 8.13.x | 8.13 | 17 |
-| 8.12.x | 8.13 | 17 |
-| 8.11.x | 8.13 | 17 |
-| 8.10.x | 8.11.1 | 17 |
-| 8.9.x | 8.11.1 | 17 |
-| 8.8.x | 8.10.2 | 17 |
-| 8.7.x | 8.9 | 17 |
-| 8.6.x / 8.5.x | 8.7 | 17 |
-| 8.4.x | 8.6 | 17 |
-| 8.3.x | 8.4 | 17 |
-| 8.2.x | 8.2 | 17 |
-| 8.1.x / 8.0.x | 8.0 | 17 |
-
-当前模板使用 `AGP 8.13.2 + Gradle 8.13`，满足官方兼容要求。AGP 9.x 与 API 37
-工具链仍在快速迭代，准备升级时应重新查看官方实时表，不要直接沿用上表推算。
-
-### Kotlin 与最低 AGP 版本对应关系
-
-Android 官方表给出的是“使用某个 Kotlin 编译器版本时所需的最低 AGP”，AGP 高于
-最低版本通常可以使用，但还需要确认 KSP、Compose Compiler 和其他编译插件。
-
-| Kotlin 版本 | 最低 Android Gradle Plugin |
-| --- | --- |
-| 2.3 | 8.13.2 |
-| 2.2 | 8.10 |
-| 2.1 | 8.6 |
-| 2.0 | 8.5 |
-| 1.9 | 8.0 |
-| 1.8 | 7.4 |
-| 1.7 | 7.2 |
-| 1.6 | 7.1 |
-
-当前模板的 `Kotlin 2.0.21 + AGP 8.13.2` 高于 Kotlin 2.0 所需的最低 AGP 8.5。
-KSP 还必须单独匹配 Kotlin 编译器；当前为：
-
-```text
-Kotlin  2.0.21
-KSP     2.0.21-1.0.27
-        └──────┘ Kotlin 版本前缀一致
-```
-
-> 这些表用于判断“能否构建”，不代表必须升级到表中最新版本。模板应优先保留经过
-> 编译、Lint、测试和真机验证的稳定组合。
-
-### 目前模板已验证的组合
-
-| 组件 | 当前版本 | 作用与约束 |
-| --- | --- | --- |
-| Android Studio | 以兼容表为准 | IDE 必须支持项目使用的 AGP |
-| Android Gradle Plugin | 8.13.2 | 决定 Android 构建行为、Gradle/JDK 要求和可用的 compileSdk 范围 |
-| Gradle Wrapper | 8.13 | 必须满足当前 AGP 的 Gradle 版本要求 |
-| Gradle 运行 JDK | 至少 JDK 17 | 同时要处于 Gradle 支持的 JDK 范围；不等同于 App 的字节码版本 |
-| Kotlin | 2.0.21 | 由 Kotlin Gradle Plugin 管理 |
-| KSP | 2.0.21-1.0.27 | 前缀需与 Kotlin 编译器版本匹配，后缀是 KSP 发布版本 |
-| compileSdk | 36 | 编译时可用的 Android API；应不低于 targetSdk |
-| targetSdk | 36 | 应用声明已适配的 Android 行为版本，会影响系统兼容策略 |
-| minSdk | 29 | 应用允许运行的最低 Android 版本 |
-
-> `compileSdk`、`targetSdk` 和 Android Studio/AGP 不是同一个版本号。看到新的 API
-> 平台并不代表只修改 `targetSdk` 就完成了升级；还要确认 AGP、Gradle、JDK 和依赖
-> 是否支持该平台。
-
-### 推荐升级顺序
-
-1. 在 Android Studio/AGP 兼容表中选择目标 AGP。
-2. 根据 AGP 发布说明升级 Gradle Wrapper 和 Gradle 运行 JDK。
-3. 按 Kotlin 支持表选择 Kotlin，并选择相同 Kotlin 前缀的 KSP 版本。
-4. 安装目标 Android SDK Platform，先升级 `compileSdk`，再评估 `targetSdk`。
-5. 最后升级 AndroidX、Room、Navigation、Coroutines 等库，并阅读各自的迁移说明。
-6. 执行 Debug/Release 编译、Lint、单元测试和真机冒烟测试。
-
-### API 37 / Android 17 升级说明
-
-如果 Android Studio 提示 `targetSdk = 36` 不是最新版本，通常表示 SDK Manager
-中已经提供 API 37。模板当前保持 36 是有意的稳定版本锁定。升级到 API 37 时应
-同时确认支持 API 37 的 AGP、Gradle、JDK 和 Kotlin/KSP 组合，然后一起修改：
+## 3. WebSocket：无需初始化 HTTP
 
 ```kotlin
-android {
-    compileSdk {
-        version = release(37)
-    }
+import com.template.framework.websocket.WebSocketConfig
 
-    defaultConfig {
-        targetSdk = 37
+val socket = Framework.initWebSocket(WebSocketConfig(
+    url = "wss://com.exmpale.xxxx/example/socket",
+    headers = { emptyMap() }, // 重连时重新读取，勿在这里阻塞读取 DataStore
+    autoReconnect = true
+))
+socket.connect()
+socket.sendMessage("ping") // true 表示入队，不代表服务端确认
+socket.disconnect()        // 停止重连，可再次 connect
+socket.release()           // 释放后需重新初始化或创建实例
+```
+
+配置完整 URL，不按 Debug 改写 ws/wss 或路径。重复 `connect()` 会跳过；刷新认证用 `connect(forceReconnect = true)`。首次握手失败与意外断线均会重试，默认退避 5s → 10s → 20s → 30s。
+
+在 Fragment 中按视图生命周期收集：
+
+```kotlin
+viewLifecycleOwner.lifecycleScope.launch {
+    viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+        launch { socket.connectionState.collect { state -> /* 渲染状态 */ } }
+        launch { socket.messageFlow.collect { message -> /* 处理消息 */ } }
     }
 }
 ```
 
-不要只把 `targetSdk` 从 36 改成 37。主版本工具链升级建议在独立分支中完成，验证
-通过后再合并到模板主分支。
+状态是 StateFlow；消息是无重放的 SharedFlow，同样内容连续到达仍逐条发送。没有订阅者时不保存消息，慢订阅者最多缓冲 64 条，超量丢弃最旧事件；可靠业务需要在 App 层实现确认、持久化与补偿。
 
+多连接用 `WebSocketManager.create(config)`，由持有者释放。全局 `initialize` 会释放旧实例。传入共享客户端时 `release` 不关闭该客户端。
+
+## 4. TLS 与权限
+
+默认使用系统信任链和主机名校验。自定义 CA 通过独立工具配置，两种网络互不依赖：
+
+```kotlin
+configureClient = {
+    TlsConfig.trustCertificate(this, appContext, R.raw.server_ca)
+}
+```
+
+将该 lambda 放入 `HttpConfig` 或 `WebSocketConfig`；import `com.template.framework.network.TlsConfig`。提供自定义证书会替代系统信任库，证书必须与目标主机匹配。
+
+使用网络需在 App Manifest 声明 `INTERNET`。模板默认禁止明文；本地 HTTP/WS 联调时仅在 debug Manifest 或按域名的 Network Security Config 中开放，不要全局关闭 TLS 校验。
+
+## 5. 存储与 UI
+
+- `Framework.getPreferences()` 提供 Token、语言、完整 HTTP / WebSocket URL 的 Flow 与 suspend 保存方法。旧 IP/Port Key 仅为兼容保留，不再自动生成 URL。
+- DataStore 文件名固定为 `framework_preferences`，不是运行时配置。自定义文件及 Key 建议在 App 层建立自己的存储管理器。
+- `DataStoreBackupHelper` 提供双写与空值回退，不是加密存储，也不保证所有故障下无损恢复；敏感数据另行选择安全存储与备份策略。
+- `BaseActivity` 首帧前仅读取语言备份，不阻塞等待 DataStore；若外部迁移只恢复了 DataStore，应由 App 异步应用语言。
+- Room 示例在 `app/data/database/ExampleDatabase.kt`，首次 `getInstance(context)` 时创建；业务继承 `RoomDatabase`，升级提供 Migration，勿默认破坏性清库。
+- Activity / Fragment 继承对应的 ViewBinding 基类，重写 `initViewBinding`、`initView`、`initListener`、`initData`；Fragment Binding 只在视图生命周期内可用。
+- 系统栏默认 edge-to-edge，确有 kiosk 需求时显式调用 `FullScreenUtils.enableFullScreen(this)`。
+- 列表接入见 [RecyclerView](RECYCLERVIEW.md)。
+
+## 6. Android Studio 检查
+
+同步并构建 App，确认 Room / ViewBinding 生成成功；运行后点击本地条目观察差分更新，再替换 URL 验证 HTTP-only、WS-only、首次连接失败重连、手动断开和页面销毁释放。当前未执行这些运行时检查。

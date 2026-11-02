@@ -2,22 +2,23 @@
 <resources>
     <string name="app_name">Framework Demo</string>
     <string name="demo_title">Android 框架模板 - Demo</string>
-    <string name="server_ip_label">服务器 IP</string>
-    <string name="server_ip_hint">192.168.1.1</string>
-    <string name="server_port_label">服务器端口</string>
-    <string name="server_port_hint">8080</string>
-    <string name="save_settings">保存设置（DataStore）</string>
-    <string name="call_login_api">调用 Login API（Retrofit + OkHttp）</string>
-    <string name="connect_websocket">连接 WebSocket</string>
-    <string name="disconnect_websocket">断开 WebSocket</string>
-    <string name="status_placeholder">运行状态会显示在这里</string>
-    <string name="server_required">请填写 IP 与端口</string>
-    <string name="server_saved">已保存：%1$s:%2$s</string>
-    <string name="login_success">登录成功：code=%1$d</string>
-    <string name="login_failed">登录失败：%1$s (code=%2$d)</string>
-    <string name="login_status">Server: %1$s:%2$s\nLogin result: %3$d %4$s</string>
-    <string name="request_failed">请求异常：%1$s</string>
-    <string name="exception_status">Exception: %1$s</string>
+    <string name="http_url_label">HTTP Base URL</string>
+    <string name="http_url_hint">https://com.exmpale.xxxx/</string>
+    <string name="websocket_url_label">WebSocket URL</string>
+    <string name="websocket_url_hint">wss://com.exmpale.xxxx/example/socket</string>
+    <string name="save_settings">保存设置（不会初始化网络）</string>
+    <string name="call_example_api">初始化 HTTP 并调用示例 API</string>
+    <string name="connect_websocket">单独初始化并连接 WebSocket</string>
+    <string name="disconnect_websocket">断开 WebSocket（停止重连）</string>
+    <string name="status_placeholder">示例域名无真实服务，请替换 URL 和接口契约。本地列表无需网络。</string>
+    <string name="server_saved">地址已保存，点击对应按钮后生效</string>
+    <string name="http_status">HTTP 业务状态：%1$d</string>
+    <string name="request_failed">操作失败：%1$s</string>
+    <string name="websocket_connecting">WebSocket 正在连接</string>
     <string name="websocket_connected">WebSocket 已连接</string>
     <string name="websocket_disconnected">WebSocket 已断开</string>
+    <string name="websocket_message">收到消息：%1$s</string>
+    <string name="list_hint">RecyclerView 示例：点击条目，通过 DiffUtil + payload 更新文本</string>
+    <string name="example_item">示例条目 %1$d</string>
+    <string name="example_item_updated">条目 %1$d 已局部更新</string>
 </resources>

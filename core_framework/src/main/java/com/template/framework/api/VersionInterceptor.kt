@@ -15,8 +15,6 @@ import okhttp3.Response
  * 版本号从 [com.template.framework.api.FrameworkConfig] 中读取，
  * 业务可在 Application.onCreate 中通过 Framework.init() 注入。
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 class VersionInterceptor : Interceptor {
 

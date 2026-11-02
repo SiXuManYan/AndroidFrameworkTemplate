@@ -14,8 +14,6 @@ import java.net.NetworkInterface
  * - 获取设备序列号（SN）
  * - 英文转大写（保留中文）
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 object DeviceUtils {
 

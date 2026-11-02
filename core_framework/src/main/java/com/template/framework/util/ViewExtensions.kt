@@ -5,8 +5,6 @@ import android.view.View
 /**
  * View 扩展函数工具类
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 
 /**

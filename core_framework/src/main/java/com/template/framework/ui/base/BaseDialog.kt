@@ -31,8 +31,6 @@ import com.template.framework.util.FullScreenUtils
  * }
  * ```
  *
- * @author Shiwei Wang
- * @date 2026-02
  */
 abstract class BaseDialog(context: Context) : Dialog(context) {
 
