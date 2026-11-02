@@ -35,9 +35,11 @@ Framework.init(
 
 仅首次初始化生效。不启动 HTTP、WebSocket 或 Room；偏好设置在 `getPreferences()` 时才创建。业务不必使用 `getRepository()`，优先组合自己的 API 与存储。
 
-## 2. HTTP：按需选择一种方式
+## 2. HTTP：选择由谁管理实例
 
-需要共享的 Retrofit 时：
+Retrofit 把接口方法转换为 HTTP 请求并解析响应；OkHttp 负责实际发送请求、连接池、超时和 TLS。下面两种方式都使用 Retrofit + OkHttp，区别是实例由框架保存，还是由自己的 App 保存。初始化只创建对象，不会自动请求服务器，也不初始化 WebSocket。
+
+### A. 框架保存共享实例（普通单后端 App 优先选择）
 
 ```kotlin
 import com.template.framework.api.NetworkModule
@@ -51,7 +53,11 @@ val api = NetworkModule.getRetrofit().create(ExampleApi::class.java)
 // ExampleApi 参考本仓库 app/data/api，然后在自己的 App 中定义接口。
 ```
 
-只需要 OkHttp，或希望多个 API / 图片加载共享连接池时，不必调用 `initHttp`：
+可通过 `NetworkModule.getClient()` 取得这个 Retrofit 使用的 OkHttp，供其他 API 或图片加载显式复用。
+
+### B. App 自己保存实例（已有客户端或多个后端时选择）
+
+不必调用 `initHttp`；保存返回的 `client` / `api`，多个服务传入同一个 `client` 即可共享连接池：
 
 ```kotlin
 val client = NetworkModule.createOkHttpClient(
@@ -63,21 +69,30 @@ val client = NetworkModule.createOkHttpClient(
 val api = NetworkModule.createApiService<ExampleApi>("https://com.exmpale.xxxx/", client)
 ```
 
-默认没有认证、客户端 ID 或版本 Header。需要认证时提供 `getToken` / `clearToken`，需要版本头时启用 `includeVersionHeaders`。示例 `ApiResponse` 仅适用于 `{code, msg, data}`，不同后端直接定义自己的响应模型。
+`createApiService` 内部仍会创建 Retrofit，不是“只用 OkHttp”。真正只用 OkHttp 时，仅创建 `client`，随后自己用 OkHttp 的 `Request` / `newCall` 发请求，不调用 `createApiService`。
+
+### 可选认证与版本 Header
+
+默认不会额外添加 `Authorization`、`clientid`、`VersionCode` 或 `VersionName` 这些业务 Header，不代表没有任何 HTTP Header。后端需要哪种就显式配置哪种；示例 `ApiResponse` 仅适用于 `{code, msg, data}`，不同后端直接定义自己的响应模型。
 
 ```kotlin
 val preferences = Framework.getPreferences()
 Framework.setOnTokenExpired { /* 回调在请求线程触发，UI 操作切到主线程 */ }
 Framework.initHttp(HttpConfig(
     baseUrl = "https://com.exmpale.xxxx/",
-    getToken = { preferences.accessToken.first() }, // import kotlinx.coroutines.flow.first
-    clearToken = { preferences.clearAccessToken() },
-    includeVersionHeaders = true,
+    getToken = { preferences.accessToken.first() }, // 请求时读 Token；import kotlinx.coroutines.flow.first
+    clearToken = { preferences.clearAccessToken() }, // 认证失效时删除 Token
+    includeVersionHeaders = true, // 仅后端需要应用版本 Header 时开启
     debug = BuildConfig.DEBUG
 ))
 ```
 
-提供 `HttpConfig.client` 时，该客户端的拦截器、超时和 TLS 均保持原样，其他客户端构建选项不再自动应用。重复初始化可更换 URL，但已创建的 API 不会自动切换，必须重新创建。
+- `getToken` 是读取回调，不保存 Token；`first()` 取 Flow 首次发出的值后结束收集。请求未自带认证头且读到非空 Token 时，自动添加 `Authorization: Bearer <token>`。
+- `clearToken` 是删除回调；收到 HTTP 401，或符合内置约定的 HTTP 200 JSON 响应中 `code == 401` 时执行，再通知 `setOnTokenExpired`。不负责自动刷新 Token。
+- 登录成功后，在协程的 IO 上下文中显式调用 `preferences.saveAccessToken(tokenFromServer)` 保存；当前存储是 DataStore Preferences 主存储 + SharedPreferences 备份，保存和删除会操作两者，不是加密存储。两个回调也可换成自己的存储实现。
+- `includeVersionHeaders` 是本库参数，不是 OkHttp 自带参数；开启后从 `Framework.init` 的配置取应用版本，添加 `VersionCode` / `VersionName`。`clientId` 同样是本库的可选参数，不会自动生成设备 ID。
+
+提供 `HttpConfig.client` 表示“直接使用已有客户端”，框架不再构建或修改它。因此同一个 `HttpConfig` 中的 `debug`、超时、`getToken`、`clearToken`、`clientId`、`includeVersionHeaders` 和 `configureClient` 不会应用到该客户端；这些选项应在创建 `client` 时配置。重复初始化可更换 URL，但已创建的 API 不会自动切换，必须重新创建。
 
 ## 3. WebSocket：无需初始化 HTTP
 
