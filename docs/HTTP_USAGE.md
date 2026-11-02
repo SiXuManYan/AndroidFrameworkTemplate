@@ -193,22 +193,3 @@ private fun requestItems(api: ExampleApi) {
 `getItems(page = 1)` 会发起 `GET <baseUrl>example/items?page=1`；网络或 HTTP 错误会抛异常，HTTP 成功仍须检查后端的业务成功码。
 
 发送 POST 时，在同样的协程与异常处理结构中调用 `api.saveItem(ExampleItem(id = 1, title = "示例"))`；处理返回的 `ApiResponse<ExampleItem>`。按钮触发的 POST 不要放进 `repeatOnLifecycle`，避免页面重新进入前台时重复提交。
-
-## 5. Markdown 折叠语法
-
-GitHub 等支持 HTML 的 Markdown 渲染器可使用以下语法；`<summary>` 后、结束标签前保留空行，内部正常写 Markdown。纯 Markdown 或禁用 HTML 的查看器可能不支持折叠。
-
-````markdown
-<details>
-<summary>点击展开：初始化后的请求示例</summary>
-
-说明文字。
-
-```kotlin
-requestItems(AppNetwork.backendApi)
-```
-
-</details>
-````
-
-给 `<details>` 添加 `open` 可默认展开。本页示例仅做文档与接口一致性检查，未执行 Gradle 或真实网络请求；替换 URL 和后端契约后，在自己的 App 中验证。
