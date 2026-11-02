@@ -39,6 +39,8 @@ Framework.init(
 
 Retrofit 把接口方法转换为 HTTP 请求并解析响应；OkHttp 负责实际发送请求、连接池、超时和 TLS。下面两种方式都使用 Retrofit + OkHttp，区别是实例由框架保存，还是由自己的 App 保存。初始化只创建对象，不会自动请求服务器，也不初始化 WebSocket。
 
+正式／测试服务器与第三方支付如何组合，以及初始化后如何调用接口，见 [HTTP 使用示例](HTTP_USAGE.md)；方式 A / B 的完整步骤可点击折叠标题展开。
+
 ### A. 框架保存共享实例（普通单后端 App 优先选择）
 
 ```kotlin
@@ -57,7 +59,7 @@ val api = NetworkModule.getRetrofit().create(ExampleApi::class.java)
 
 ### B. App 自己保存实例（已有客户端或多个后端时选择）
 
-不必调用 `initHttp`；保存返回的 `client` / `api`，多个服务传入同一个 `client` 即可共享连接池：
+不必调用 `initHttp`；保存返回的 `client` / `api`。认证和拦截器规则兼容时，多个服务可传入同一个 `client` 共享连接池；自家服务与第三方建议隔离客户端，避免泄露 Token 或错误清除登录态：
 
 ```kotlin
 val client = NetworkModule.createOkHttpClient(

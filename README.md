@@ -26,6 +26,7 @@ Kotlin + ViewBinding 的 Android Library（`:core_framework`），接入使用�
 ## 文档
 
 - [快速接入](docs/QUICKSTART.md)：初始化、HTTP、WebSocket、存储和 UI。
+- [HTTP 使用示例](docs/HTTP_USAGE.md)：正式／测试环境、第三方支付，以及方式 A / B 初始化后的请求代码。
 - [RecyclerView](docs/RECYCLERVIEW.md)：适配器选择、差分、payload、拖拽。
 - [可复用组件](docs/REUSABLE_COMPONENTS.md)：控件、分页吸附、分割线、弹窗与工具示例。
 - [分包与职责](docs/ARCHITECTURE.md)：框架与业务边界。
