@@ -6,6 +6,8 @@
 - 示例地址统一用 `https://com.exmpale.xxxx/`（不可访问的占位地址）；WebSocket 用对应的 `wss://com.exmpale.xxxx/`。
 - 改动保持最小范围；兼容入口标明替代方式，破坏性变更同步更新迁移文档。
 - 除非使用者或作者明确要求，否则不得删除作者电脑上的任何文件。
+- 开发过程中无需使用真机或模拟器验证，优先完成实现，功能完成后由作者自行测试。
+- 每项功能完成后，按 **先同步远端（update / pull）→ commit → push** 的顺序执行。
 
 ## 初始化与安全
 - `Framework.init` 不得创建 HTTP/WebSocket 客户端、连接服务器或打开数据库；能力分别按需初始化。
@@ -26,4 +28,4 @@
 - Kotlin/Android 可复用知识按 `E:\android-knowledge-base\AGENTS.md` 写入知识库，不记录业务敏感信息。
 - 未经用户明确要求，不执行 Gradle 编译、测试、Lint、安装或其他 Gradle 验证；普通修改交回 Android Studio 验证。
 - 构建配置、依赖或跨模块 API 的高风险修改，应说明验证价值，由用户决定是否运行。
-- 不覆盖用户现有改动，不执行破坏性 Git 命令，不自动提交。
+- 不覆盖用户现有改动，不执行破坏性 Git 命令；每项功能完成后，按 **先同步远端（update / pull）→ commit → push** 的顺序执行，只提交本任务相关文件。
