@@ -42,3 +42,11 @@ Kotlin + ViewBinding 的 Android Library（`:core_framework`），接入使用�
 此次改动仅做源码、资源、脱敏和文档一致性检查，**未执行 Gradle 构建、测试或安装**。请在 Android Studio 验证示例列表、独立 HTTP/WS 启动及 Room 代码生成；HTTP/WS 联调需要自己的后端。
 
 许可证：[MIT](LICENSE)。
+
+## 工程维护记录
+
+### 2026-11-20：Agent 任务收尾与实现原则
+
+长期约定见 [AGENTS.md](AGENTS.md)。本次补充四项要求：完成工作后同步相关 Markdown 与版本更新日志；修正过时或错误的技术说明；避免过度防御式编程；大规模任务在 commit / push 前再次 update，处理远程冲突后再交付。用户可感知变化沿用用户版本日志，纯工程维护记于本文。
+
+本次仅修改工程文档，静态检查覆盖规则一致性、原有内容保全、新增本地链接与 `git diff --check`；未运行构建、测试、Lint 或设备验证。
